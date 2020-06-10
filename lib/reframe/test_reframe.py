@@ -7,10 +7,16 @@
 
 import argparse
 import os
-import pytest
 import sys
 
-import unittests.fixtures as fixtures
+prefix = os.path.join(os.path.abspath(os.path.dirname(__file__)))
+sys.path += [
+    os.path.join(prefix),
+    os.path.join(prefix, 'external', 'lib', 'python3.7', 'site-packages')
+]
+
+import pytest   # noqa: F401, F403
+import unittests.fixtures as fixtures   # noqa: F401, F403
 
 
 if __name__ == '__main__':
@@ -38,5 +44,10 @@ if __name__ == '__main__':
     fixtures.USER_CONFIG_FILE = options.rfm_user_config
     fixtures.USER_SYSTEM = options.rfm_user_system
     fixtures.init_runtime()
+
+    # If no positional arguments are given, use ReFrame's unittests
+    if all(arg.startswith('-') for arg in rem_args):
+        rem_args.append('unittests')
+
     sys.argv = [sys.argv[0], *rem_args]
     sys.exit(pytest.main())
