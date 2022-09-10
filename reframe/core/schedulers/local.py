@@ -15,6 +15,17 @@ from reframe.core.backends import register_scheduler
 from reframe.core.exceptions import ReframeError
 
 
+_FINISHED_PIDS = {}
+
+
+def _collect_children(signum, stack):
+    pid, status = os.waitpid(-1, 0)
+    _FINISHED_PIDS[pid] = status
+
+
+signal.signal(signal.SIGCHLD, _collect_children)
+
+
 class _TimeoutExpired(ReframeError):
     pass
 
@@ -155,15 +166,15 @@ class LocalJobScheduler(sched.JobScheduler):
         if job is None or job.jobid is None:
             return
 
-        try:
-            pid, status = os.waitpid(job.jobid, os.WNOHANG)
-        except OSError as e:
-            if e.errno == errno.ECHILD:
-                # No unwaited children
-                self.log('no more unwaited children')
-                return
-            else:
-                raise e
+        # try:
+        #     pid, status = os.waitpid(job.jobid, os.WNOHANG)
+        # except OSError as e:
+        #     if e.errno == errno.ECHILD:
+        #         # No unwaited children
+        #         self.log('no more unwaited children')
+        #         return
+        #     else:
+        #         raise e
 
         if job.cancel_time:
             # Job has been cancelled; give it a grace period and kill it
@@ -175,6 +186,11 @@ class LocalJobScheduler(sched.JobScheduler):
 
             self._kill_all(job)
             return
+
+        if job.jobid in _FINISHED_PIDS:
+            pid, status = job.jobid, _FINISHED_PIDS[job.jobid]
+        else:
+            pid, status = None, None
 
         if not pid:
             # Job has not finished; check if we have reached a timeout
