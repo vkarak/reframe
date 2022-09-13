@@ -20,6 +20,7 @@ _FINISHED_PIDS = {}
 
 def _collect_children(signum, stack):
     pid, status = os.waitpid(-1, 0)
+    print(f'collected {pid}')
     _FINISHED_PIDS[pid] = status
 
 

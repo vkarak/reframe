@@ -952,6 +952,7 @@ def main():
                    f"{':'.join(loader.load_path)!r}")
     print_infoline('stage directory', repr(session_info['prefix_stage']))
     print_infoline('output directory', repr(session_info['prefix_output']))
+    print_infoline('log file(s)', logging.log_files())
     printer.info('')
     try:
         logging.getprofiler().enter_region('test processing')

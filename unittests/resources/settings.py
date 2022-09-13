@@ -257,11 +257,11 @@ site_configuration = {
     ],
     'logging': [
         {
-            'level': 'debug',
+            'level': 'debug2',
             'handlers': [
                 {
                     'type': 'file',
-                    'level': 'debug',
+                    'level': 'debug2',
                     'format': (
                         '[%(check_job_completion_time)s] %(levelname)s: '
                         '%(check_name)s: %(message)s'
