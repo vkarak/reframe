@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
+from reframe.core.logging import getlogger
 import errno
 import os
 import signal
@@ -20,7 +21,7 @@ _FINISHED_PIDS = {}
 
 def _collect_children(signum, stack):
     pid, status = os.waitpid(-1, 0)
-    print(f'collected {pid}')
+    getlogger().debug2(f'collected {pid}')
     _FINISHED_PIDS[pid] = status
 
 
