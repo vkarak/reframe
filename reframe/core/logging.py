@@ -15,6 +15,9 @@ import socket
 import sys
 import time
 import urllib
+from rich.console import Console
+from rich.highlighter import NullHighlighter
+from rich.logging import RichHandler
 
 import reframe.utility.color as color
 import reframe.utility.jsonext as jsonext
@@ -236,6 +239,56 @@ class MultiFileHandler(logging.FileHandler):
             super().close()
 
 
+class RichStreamHandler(logging.StreamHandler):
+    '''Stream handler that can handle Rich formatted text.'''
+
+    def __init__(self, stream=None):
+        super().__init__(stream)
+        self.console = Console(file=self.stream,
+                               highlighter=NullHighlighter(),
+                               width=sys.maxsize)
+
+    def emit(self, record):
+        user_console = getattr(record, 'rich_console', None)
+        if user_console:
+            user_console.file = self.stream
+            console = user_console
+        else:
+            console = self.console
+
+        try:
+            rich_object = getattr(record, 'rich_object', None)
+            if rich_object is not None:
+                console.print(rich_object)
+            else:
+                msg = self.format(record)
+                console.print(msg, crop=False, end=self.terminator)
+        except Exception:
+            self.handleError(record)
+
+
+class RichFileHandler(logging.FileHandler):
+    '''FileHandler that can handle Rich formatted text.'''
+
+    def __init__(self, filename, mode='a', encoding=None, delay=False):
+        super().__init__(filename, mode, encoding, delay)
+        self.console = None
+
+    def emit(self, record):
+        if self.stream is None:
+            self.stream = open(self.baseFilename, self.mode, self.encoding)
+
+        if self.console is None:
+            self.console = Console(file=self.stream,
+                                   no_color=True, width=sys.maxsize)
+
+        try:
+            msg = self.format(record)
+            self.console.print(msg, end=self.terminator)
+        except Exception:
+            self.handleError(record)
+
+
 def _format_time_rfc3339(timestamp, datefmt):
     tz_suffix = time.strftime('%z', timestamp)
     tz_rfc3339 = tz_suffix[:-2] + ':' + tz_suffix[-2:]
@@ -369,8 +422,9 @@ def _create_file_handler(site_config, config_prefix):
         filename = f'{basename}_{time.strftime(timestamp)}{ext}'
 
     append = site_config.get(f'{config_prefix}/append')
-    return logging.handlers.RotatingFileHandler(filename,
-                                                mode='a+' if append else 'w+')
+    # return logging.handlers.RotatingFileHandler(filename,
+    #                                             mode='a+' if append else 'w+')
+    return RichFileHandler(filename, mode='a+' if append else 'w+')
 
 
 def _create_filelog_handler(site_config, config_prefix):
@@ -428,9 +482,9 @@ def _create_syslog_handler(site_config, config_prefix):
 def _create_stream_handler(site_config, config_prefix):
     stream = site_config.get(f'{config_prefix}/name')
     if stream == 'stdout':
-        return logging.StreamHandler(stream=sys.stdout)
+        return RichStreamHandler(stream=sys.stdout)
     elif stream == 'stderr':
-        return logging.StreamHandler(stream=sys.stderr)
+        return RichStreamHandler(stream=sys.stderr)
     else:
         # This should not happen
         raise AssertionError(f'unknown stream: {stream}')
@@ -654,6 +708,7 @@ def _extract_handlers(site_config, handlers_group):
         hdlr.setFormatter(RFC3339Formatter(fmt=fmt,
                                            datefmt=datefmt, perffmt=perffmt))
         hdlr.setLevel(_check_level(level))
+        hdlr._rfm_type = handler_type
         handlers.append(hdlr)
 
     return handlers
@@ -756,7 +811,7 @@ class LoggerAdapter(logging.LoggerAdapter):
     def std_stream_handlers(self):
         if self.logger:
             return [h for h in self.logger.handlers
-                    if isinstance(h, logging.StreamHandler)]
+                    if h and h._rfm_type in ('stream', 'rich')]
         else:
             return []
 
@@ -813,19 +868,34 @@ class LoggerAdapter(logging.LoggerAdapter):
             self.log(level, msg)
 
     def process(self, msg, kwargs):
-        # Setup dynamic fields of the check
+        # Setup dynamic fields of the check. We do not call super().process()
+        # here, because we want to make sure that the it's the user extras
+        # that will be updated and passed down to the record, not the "global"
+        # logger extras. The reason for this is that if something was added to
+        # the extras otherwise, it would remain forever
         self._update_check_extras()
-        try:
-            self.extra.update(kwargs['extra'])
-        except KeyError:
-            pass
-
-        return super().process(msg, kwargs)
+        user_extra = kwargs.get('extra', {})
+        user_extra.update(self.extra)
+        kwargs['extra'] = user_extra
+        return msg, kwargs
 
     # Override log() function to treat `None` loggers
     def log(self, level, msg, *args, **kwargs):
-        if self.logger:
-            super().log(level, msg, *args, **kwargs)
+        if not self.logger:
+            return
+
+        if self.colorize:
+            if level < INFO:
+                msg = f'[grey50]{msg}[/grey50]'
+            elif level == WARNING:
+                msg = f'[yellow]{msg}[/yellow]'
+            elif level == ERROR:
+                msg = f'[error]{msg}[/error]'
+
+        super().log(level, msg, *args, **kwargs)
+
+    def debug(self, message, *args, **kwargs):
+        self.log(DEBUG, message, *args, **kwargs)
 
     def debug2(self, message, *args, **kwargs):
         self.log(DEBUG2, message, *args, **kwargs)
@@ -840,17 +910,11 @@ class LoggerAdapter(logging.LoggerAdapter):
 
             _WARN_ONCE.add(message)
 
-        message = f'WARNING: {message}'
-        if self.colorize:
-            message = color.colorize(message, color.YELLOW)
-
+        message = f'[bold]WARNING[/bold]: {message}'
         super().warning(message, *args, **kwargs)
 
     def error(self, message, *args, **kwargs):
-        message = f'ERROR: {message}'
-        if self.colorize:
-            message = color.colorize(message, color.RED)
-
+        message = f'[bold]ERROR[/bold]: {message}'
         super().error(message, *args, **kwargs)
 
     def adjust_verbosity(self, num_steps):

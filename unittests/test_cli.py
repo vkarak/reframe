@@ -33,8 +33,7 @@ def run_command_inline(argv, funct, *args, **kwargs):
     with contextlib.redirect_stdout(captured_stdout):
         with contextlib.redirect_stderr(captured_stderr):
             try:
-                with rt.temp_runtime(None):
-                    exitcode = funct(*args, **kwargs)
+                exitcode = funct(*args, **kwargs)
             except SystemExit as e:
                 exitcode = e.code
             finally:
@@ -63,7 +62,8 @@ def run_reframe(tmp_path, perflogdir, monkeypatch):
                      more_options=None,
                      mode=None,
                      config_file='unittests/resources/config/settings.py',
-                     perflogdir=str(perflogdir)):
+                     perflogdir=str(perflogdir),
+                     postrun=None):
         import reframe.frontend.cli as cli
 
         # We always pass the --report-file option, because we don't want to
@@ -105,7 +105,13 @@ def run_reframe(tmp_path, perflogdir, monkeypatch):
         if more_options:
             argv += more_options
 
-        return run_command_inline(argv, cli.main)
+        with rt.temp_runtime(None):
+            with logging.logging_sandbox():
+                ret = run_command_inline(argv, cli.main)
+                if postrun:
+                    postrun()
+
+        return ret
 
     monkeypatch.setenv('HOME', str(tmp_path))
     return _run_reframe
@@ -130,13 +136,18 @@ def remote_exec_ctx(user_exec_ctx):
 
 
 def test_check_success(run_reframe, tmp_path):
-    returncode, stdout, _ = run_reframe(more_options=['--save-log-files'])
+    def _assert_logfile_saved():
+        # This can only be asserted in the same environment that the reframe
+        # was run, therefore we pass it as `postrun` check to `run_reframe()`
+        logfile = logging.log_files()[0]
+        assert os.path.exists(tmp_path / 'output' / logfile)
+
+    returncode, stdout, _ = run_reframe(more_options=['--save-log-files'],
+                                        postrun=_assert_logfile_saved)
     assert 'PASSED' in stdout
     assert 'FAILED' not in stdout
     assert returncode == 0
 
-    logfile = logging.log_files()[0]
-    assert os.path.exists(tmp_path / 'output' / logfile)
     assert os.path.exists(tmp_path / 'report.json')
 
 
@@ -828,7 +839,7 @@ def test_maxfail_negative(run_reframe):
     )
     assert 'Traceback' not in stdout
     assert 'Traceback' not in stderr
-    assert "--maxfail should be a non-negative integer: -2" in stdout
+    assert '--maxfail should be a non-negative integer: -2' in stdout
     assert returncode == 1
 
 
@@ -889,19 +900,19 @@ def test_exec_order(run_reframe, exec_order):
 
     # Verify the order
     if exec_order == 'name':
-        repeat_no = sn.extractsingle_s(r'- HelloTest.*repeat_no=(\d+)',
+        repeat_no = sn.extractsingle_s(r'HelloTest.*repeat_no=(\d+)',
                                        stdout, 1, int, 2).evaluate()
         assert repeat_no == 10
     elif exec_order == 'rname':
-        repeat_no = sn.extractsingle_s(r'- HelloTest.*repeat_no=(\d+)',
+        repeat_no = sn.extractsingle_s(r'HelloTest.*repeat_no=(\d+)',
                                        stdout, 1, int, -3).evaluate()
         assert repeat_no == 10
     elif exec_order == 'uid':
-        repeat_no = sn.extractsingle_s(r'- HelloTest.*repeat_no=(\d+)',
+        repeat_no = sn.extractsingle_s(r'HelloTest.*repeat_no=(\d+)',
                                        stdout, 1, int, -1).evaluate()
         assert repeat_no == 10
     elif exec_order == 'ruid':
-        repeat_no = sn.extractsingle_s(r'- HelloTest.*repeat_no=(\d+)',
+        repeat_no = sn.extractsingle_s(r'HelloTest.*repeat_no=(\d+)',
                                        stdout, 1, int, 0).evaluate()
         assert repeat_no == 10
 
@@ -915,7 +926,9 @@ def test_detect_host_topology(run_reframe):
     assert 'Traceback' not in stdout
     assert 'Traceback' not in stderr
     assert returncode == 0
-    assert stdout == json.dumps(cpuinfo(), indent=2) + '\n'
+
+    cpuinfo_stdout = json.loads(stdout)
+    assert cpuinfo_stdout == cpuinfo()
 
 
 def test_detect_host_topology_file(run_reframe, tmp_path):

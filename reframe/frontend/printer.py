@@ -4,9 +4,16 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import datetime
+from rich.console import Console
+from rich.emoji import Emoji
+from rich.highlighter import JSONHighlighter
+from rich.table import Table
+from rich.text import Text
+from rich.theme import Theme
 
 import reframe.core.logging as logging
 import reframe.utility.color as color
+import reframe.utility.jsonext as jsonext
 
 
 class PrettyPrinter:
@@ -71,6 +78,33 @@ class PrettyPrinter:
             self.separator(separator, msg)
         else:
             self.info(msg)
+
+    def log_json(self, level, obj):
+        console = Console(highlighter=JSONHighlighter())
+        self.log(level, jsonext.dumps(obj, indent=2),
+                 extra={'rich_console': console})
+
+    def info_json(self, obj):
+        return self.log_json(logging.INFO, obj)
+
+    def info_session(self, obj):
+        grid = Table.grid()
+        grid.add_column(style='bold blue')
+        grid.add_column(style='italic')
+        grid.add_row('  Version: ', obj['version'])
+        grid.add_row('  Command: ', obj['cmdline'])
+        grid.add_row('  Launched by: ',
+                     f"{obj['user'] or '<unknown>'}@{obj['hostname']}")
+        grid.add_row('  Working directory: ', obj['workdir'])
+        grid.add_row('  Configuration files: ', ', '.join(obj['config_files']))
+        grid.add_row('  Check search path: ',
+                     f"{'(R) ' if obj['check_search_recurse'] else ''}"
+                     f"{':'.join(obj['check_search_path'])}")
+        grid.add_row('  Stage directory: ', obj['prefix_stage'])
+        grid.add_row('  Output directory: ', obj['prefix_output'])
+        grid.add_row('  Log files: ', ', '.join(logging.log_files()))
+        grid.add_row()
+        self.info('', extra={'rich_console': Console(), 'rich_object': grid})
 
     def __getattr__(self, attr):
         # delegate all other attribute lookup to the underlying logger

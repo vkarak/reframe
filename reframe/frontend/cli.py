@@ -13,6 +13,8 @@ import socket
 import sys
 import time
 import traceback
+from rich.console import Console
+
 
 import reframe
 import reframe.core.config as config
@@ -38,10 +40,11 @@ from reframe.frontend.executors.policies import (SerialExecutionPolicy,
 from reframe.frontend.executors import Runner, generate_testcases
 from reframe.frontend.loader import RegressionCheckLoader
 from reframe.frontend.printer import PrettyPrinter
+from reframe.utility.highlight import hS, hT
 
 
 def format_env(envvars):
-    ret = '[ReFrame Environment]\n'
+    ret = '[b]ReFrame Environment[/b]\n'
     notset = '<not set>'
     envvars = [*envvars, 'RFM_INSTALL_PREFIX']
     ret += '\n'.join(sorted(f'  {e}={os.getenv(e, notset)}' for e in envvars))
@@ -50,7 +53,9 @@ def format_env(envvars):
 
 @logging.time_function
 def list_checks(testcases, printer, detailed=False, concretized=False):
-    printer.info('[List of matched checks]')
+    from rich.pretty import Pretty
+
+    printer.info('[b]List of matched checks[/b]')
     unique_checks = set()
 
     def dep_lines(u, *, prefix, depth=0, lines=None, printed=None):
@@ -80,9 +85,10 @@ def list_checks(testcases, printer, detailed=False, concretized=False):
 
             location = inspect.getfile(type(u.check))
             if detailed:
-                details = f' [variant: {u.check.variant_num}, file: {location!r}]'
+                details = (f' \[[i]variant: [b]{u.check.variant_num}[/b], '
+                           f'file: [green]{location!r}[/green][/i]]')
 
-            lines.append(f'{prefix}^{name_info}{tc_info}{details}')
+            lines.append(f'{prefix}^{hT(name_info + tc_info)}{details}')
 
         return lines
 
@@ -97,11 +103,12 @@ def list_checks(testcases, printer, detailed=False, concretized=False):
 
         location = inspect.getfile(type(t.check))
         if detailed:
-            details = f' [variant: {t.check.variant_num}, file: {location!r}]'
+            details = (f' \[[i]variant: [b]{t.check.variant_num}[/b], '
+                       f'file: [green]{location!r}[/green][/i]]')
 
         if concretized or (not concretized and
                            t.check.unique_name not in unique_checks):
-            printer.info(f'- {name_info}{tc_info}{details}')
+            printer.info(f':right_arrow: {hT(name_info + tc_info)}{details}')
 
         if not t.check.is_fixture():
             unique_checks.add(t.check.unique_name)
@@ -110,9 +117,9 @@ def list_checks(testcases, printer, detailed=False, concretized=False):
             printer.info(l)
 
     if concretized:
-        printer.info(f'Concretized {len(testcases)} test case(s)\n')
+        printer.info(f'Concretized [b]{len(testcases)}[/b] test case(s)\n')
     else:
-        printer.info(f'Found {len(unique_checks)} check(s)\n')
+        printer.info(f'Found [b]{len(unique_checks)}[/b] check(s)\n')
 
 
 @logging.time_function
@@ -162,15 +169,15 @@ def describe_checks(testcases, printer):
             rec['@required'] = required
             records.append(dict(sorted(rec.items())))
 
-    printer.info(jsonext.dumps(records, indent=2))
+    printer.info_json(records)
 
 
 def list_tags(testcases, printer):
-    printer.info('[List of unique tags]')
+    printer.info('[b]List of unique tags[/b]')
     tags = set()
     tags = tags.union(*(t.check.tags for t in testcases))
     printer.info(', '.join(f'{t!r}' for t in sorted(tags)))
-    printer.info(f'Found {len(tags)} tag(s)\n')
+    printer.info(f'Found [b]{len(tags)}[/b] tag(s)\n')
 
 
 def logfiles_message():
@@ -181,7 +188,7 @@ def logfiles_message():
     else:
         msg += f'{", ".join(repr(f) for f in log_files)}'
 
-    return msg
+    return hS(msg)
 
 
 def calc_verbosity(site_config, quiesce):
@@ -783,7 +790,7 @@ def main():
         printer.setLevel(logging.INFO)
         config_param = options.show_config
         if config_param == 'all':
-            printer.info(str(rt.site_config))
+            printer.info_json(str(rt.site_config))
         else:
             # Create a unique value to differentiate between configuration
             # parameters with value `None` and invalid ones
@@ -794,7 +801,7 @@ def main():
                     f'no such configuration parameter found: {config_param}'
                 )
             else:
-                printer.info(json.dumps(value, indent=2))
+                printer.info_json(value)
 
         sys.exit(0)
 
@@ -807,7 +814,7 @@ def main():
         printer.setLevel(logging.INFO)
         topofile = options.detect_host_topology
         if topofile == '-':
-            printer.info(json.dumps(s_cpuinfo, indent=2))
+            printer.info_json(s_cpuinfo)
         else:
             try:
                 with open(topofile, 'w') as fp:
@@ -889,6 +896,8 @@ def main():
         printer.info(f"  {param.ljust(18)} {value}")
 
     session_info = {
+        'check_search_path': loader.load_path,
+        'check_search_recurse': loader.recurse,
         'cmdline': ' '.join(sys.argv),
         'config_files': rt.site_config.sources,
         'data_version': runreport.DATA_VERSION,
@@ -900,27 +909,10 @@ def main():
         'workdir': os.getcwd(),
     }
 
-    # Print command line
-    printer.info(f"[ReFrame Setup]")
-    print_infoline('version', session_info['version'])
-    print_infoline('command', repr(session_info['cmdline']))
-    print_infoline(
-        f"launched by",
-        f"{session_info['user'] or '<unknown>'}@{session_info['hostname']}"
-    )
-    print_infoline('working directory', repr(session_info['workdir']))
-    print_infoline(
-        'settings files',
-        ', '.join(repr(x) for x in session_info['config_files'])
-    )
-    print_infoline('check search path',
-                   f"{'(R) ' if loader.recurse else ''}"
-                   f"{':'.join(loader.load_path)!r}")
-    print_infoline('stage directory', repr(session_info['prefix_stage']))
-    print_infoline('output directory', repr(session_info['prefix_output']))
-    print_infoline('log files',
-                   ', '.join(repr(s) for s in logging.log_files()))
-    printer.info('')
+    # Print session info
+    printer.info('[b]ReFrame Setup[/b]')
+    printer.info_session(session_info)
+
     try:
         logging.getprofiler().enter_region('test processing')
 
@@ -1330,10 +1322,10 @@ def main():
                         jsonext.dump(json_report, fp, indent=2)
                         fp.write('\n')
 
-                printer.info(f'Run report saved in {report_file!r}')
+                printer.info(hS(f'Run report saved in {report_file!r}'))
             except OSError as e:
                 printer.warning(
-                    f'failed to generate report in {report_file!r}: {e}'
+                    hS(f'failed to generate report in {report_file!r}: {e}')
                 )
 
             # Generate the junit xml report for this session

@@ -289,8 +289,8 @@ class TestStats:
             msg = r['fail_reason']
             if isinstance(r['fail_info']['exc_value'], errors.SanityError):
                 lines = [msg]
-                lines += _head_n(r['job_stdout'], prefix = r['stagedir'])
-                lines += _head_n(r['job_stderr'], prefix = r['stagedir'])
+                lines += _head_n(r['job_stdout'], prefix=r['stagedir'])
+                lines += _head_n(r['job_stderr'], prefix=r['stagedir'])
                 msg = '\n'.join(lines)
 
             printer.info(f"  * Reason: {msg}")
