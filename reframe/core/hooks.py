@@ -124,7 +124,6 @@ class Hook:
     @property
     def stages(self):
         return self._rfm_attach
-        # return [stage for stage, _ in self._rfm_attach]
 
     def __getattr__(self, attr):
         return getattr(self.__fn, attr)
@@ -153,7 +152,7 @@ class HookRegistry:
     '''Global hook registry.'''
 
     def __init__(self, hooks=None):
-        self.__hooks = util.OrderedSet()
+        self.__hooks = []
         if hooks is not None:
             self.update(hooks)
 
@@ -173,30 +172,31 @@ class HookRegistry:
         of the pipeline where they must be attached. Dependencies will be
         resolved first in the post-setup phase if not assigned elsewhere.
         '''
-
         if hasattr(v, '_rfm_attach'):
             # Always override hooks with the same name
             h = Hook(v)
-            self.__hooks.discard(h)
-            self.__hooks.add(h)
+            try:
+                pos = self.__hooks.index(h)
+            except ValueError:
+                self.__hooks.append(h)
+            else:
+                self.__hooks[pos] = h
         elif hasattr(v, '_rfm_resolve_deps'):
             v._rfm_attach = [('post_setup', None)]
-            self.__hooks.add(Hook(v))
+            self.__hooks.append(Hook(v))
 
-    def update(self, other, *, denied_hooks=None):
-        '''Update the hook registry with the hooks from another hook registry.
-
-        The optional ``denied_hooks`` argument takes a set of disallowed
-        hook names, preventing their inclusion into the current hook registry.
-        '''
+    def update(self, other):
+        '''Update the hook registry with the hooks from another hook
+        registry.'''
 
         assert isinstance(other, HookRegistry)
-        denied_hooks = denied_hooks or set()
         for h in other:
-            if h.__name__ not in denied_hooks:
-                # Hooks in `other` override ours
-                self.__hooks.discard(h)
-                self.__hooks.add(h)
+            try:
+                pos = self.__hooks.index(h)
+            except ValueError:
+                self.__hooks.append(h)
+            else:
+                self.__hooks[pos] = h
 
     def __repr__(self):
         return repr(self.__hooks)
