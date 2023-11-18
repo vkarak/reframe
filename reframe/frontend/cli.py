@@ -884,7 +884,7 @@ def main():
                     json.dump(s_cpuinfo, fp, indent=2)
                     fp.write('\n')
             except OSError as e:
-                getlogger().error(
+                logging.getlogger().error(
                     f'could not write topology file: {topofile!r}'
                 )
                 sys.exit(1)
