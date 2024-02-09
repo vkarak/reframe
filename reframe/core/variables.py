@@ -337,7 +337,7 @@ class TestVar:
         if self.is_alias():
             self._target._default_value = value
         else:
-            self._p_default_value = value
+            self._p_default_value = self._p_field.__set__(None, value)
 
     @property
     def default_value(self):
@@ -379,6 +379,17 @@ class TestVar:
 
     def __set_name__(self, owner, name):
         self._name = name
+        self._p_field.__set_name__(owner, name)
+
+        # Type check and convert the variable's value if defined
+        if self.is_defined():
+            if isinstance(self._p_default_value, TestVar):
+                value = self._p_default_value._p_default_value
+            else:
+                value = self._p_default_value
+
+            with suppress_deprecations():
+                self._p_default_value = self._p_field.__set__(None, value)
 
     def __setattr__(self, name, value):
         '''Set any additional variable attribute into the default value.'''
