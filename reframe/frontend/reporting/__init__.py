@@ -254,7 +254,10 @@ class RunReport:
     @classmethod
     def create_from_perflog(cls, *logfiles, format=None,
                             merge_records=None, datefmt=None,
-                            ignore_lines=None):
+                            ignore_lines=None, ignore_records=None):
+        def _filter_record(rec):
+            return eval(ignore_records, rec)
+
         def _do_merge(dst, src):
             system = src.get('system')
             part = src.get('partition')
@@ -314,6 +317,8 @@ class RunReport:
                         continue
 
                     rec = m.groupdict()
+                    if _filter_record(rec):
+                        continue
 
                     # Groom the record
                     if 'job_completion_time' in rec:
