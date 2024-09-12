@@ -256,7 +256,7 @@ class RunReport:
                             merge_records=None, datefmt=None,
                             ignore_lines=None, ignore_records=None):
         def _filter_record(rec):
-            return eval(ignore_records, rec)
+            return eval(ignore_records, {}, rec)
 
         def _do_merge(dst, src):
             system = src.get('system')
