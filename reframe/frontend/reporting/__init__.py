@@ -15,6 +15,7 @@ import re
 import socket
 import time
 import uuid
+from collections import UserDict
 from collections.abc import Hashable
 from filelock import FileLock
 
@@ -487,18 +488,33 @@ class RunReport:
             )
 
 
-def _group_key(groups, testcase):
+class _TCProxy(UserDict):
+    '''Test case to support dynamic fields'''
+    def __init__(self, testcase):
+        super().__init__(testcase)
+
+    def __getitem__(self, key):
+        val = super().__getitem__(key)
+        if key == 'job_nodelist':
+            val = nodelist_abbrev(val)
+
+        return val
+
+    def __missing__(self, key):
+        if key == 'basename':
+            return self.data['name'].split()[0]
+
+        raise KeyError(key)
+
+
+def _group_key(groups, testcase: _TCProxy):
     key = []
     for grp in groups:
         with reraise_as(ReframeError, (KeyError,), 'no such group'):
             val = testcase[grp]
+            if not isinstance(val, Hashable):
+                val = str(val)
 
-        if grp == 'job_nodelist':
-            # Fold nodelist before adding as a key element
-            key.append(nodelist_abbrev(val))
-        elif not isinstance(val, Hashable):
-            key.append(str(val))
-        else:
             key.append(val)
 
     return tuple(key)
@@ -507,7 +523,7 @@ def _group_key(groups, testcase):
 @time_function
 def _group_testcases(testcases, group_by, extra_cols):
     grouped = {}
-    for tc in testcases:
+    for tc in map(_TCProxy, testcases):
         for pvar, reftuple in tc['perfvalues'].items():
             pvar = pvar.split(':')[-1]
             pval, pref, plower, pupper, punit = reftuple
@@ -518,7 +534,7 @@ def _group_testcases(testcases, group_by, extra_cols):
 
             plower = pref * (1 + plower) if plower is not None else -math.inf
             pupper = pref * (1 + pupper) if pupper is not None else math.inf
-            record = {
+            record = _TCProxy({
                 'pvar': pvar,
                 'pval': pval,
                 'pref': pref,
@@ -526,7 +542,7 @@ def _group_testcases(testcases, group_by, extra_cols):
                 'pupper': pupper,
                 'punit': punit,
                 **{k: tc[k] for k in group_by + extra_cols if k in tc}
-            }
+            })
             key = _group_key(group_by, record)
             grouped.setdefault(key, [])
             grouped[key].append(record)
@@ -549,10 +565,7 @@ def _aggregate_perf(grouped_testcases, aggr_fn, cols):
         aggr_data[key]['pval'] = aggr_fn(tc['pval'] for tc in seq)
         with reraise_as(ReframeError, (KeyError,), 'no such column'):
             for c in cols:
-                aggr_data[key][c] = other_aggr(
-                    nodelist_abbrev(tc[c]) if c == 'job_nodelist' else tc[c]
-                    for tc in seq
-                )
+                aggr_data[key][c] = other_aggr(tc[c] for tc in seq)
 
     return aggr_data
 
