@@ -71,7 +71,7 @@ systems:
       num_cpus_per_socket: 8
       num_sockets: 1
       topology:
-        num_nodes: ['0x000000ff']
+        numa_nodes: ['0x000000ff']
         sockets: ['0x000000ff']
         cores: ['0x00000003', '0x0000000c', '0x00000030', '0x000000c0']
         caches:
