@@ -64,6 +64,8 @@ class PrettyPrinter:
                 status = color.colorize(status, color.YELLOW)
             elif status_stripped in ('FAIL', 'FAILED', 'ERROR'):
                 status = color.colorize(status, color.RED)
+            elif status_stripped == 'XFAIL':
+                status = color.colorize(status, color.MAGENTA)
             else:
                 status = color.colorize(status, color.GREEN)
 

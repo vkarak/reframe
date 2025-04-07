@@ -8,6 +8,7 @@ import reframe.utility.sanity as sn
 
 
 @rfm.simple_test
+@rfm.xfail('bug 123', lambda t: t.known_failure > 1)
 class HelloTest(rfm.RegressionTest, pin_prefix=True):
     descr = 'C Hello World test'
 
@@ -17,9 +18,13 @@ class HelloTest(rfm.RegressionTest, pin_prefix=True):
     sourcepath = 'hello.c'
     tags = {'foo', 'bar'}
     maintainers = ['VK']
+    known_failure = variable(int, value=0)
 
     @sanity_function
     def validate(self):
+        if self.known_failure:
+            return sn.assert_true(0)
+
         return sn.assert_found(r'Hello, World\!', self.stdout)
 
 

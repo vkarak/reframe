@@ -33,6 +33,7 @@ import reframe.utility.sanity as sn
 import reframe.utility.typecheck as typ
 import reframe.utility.udeps as udeps
 from reframe.core.backends import getlauncher, getscheduler
+from reframe.core.builtins import XFailReference
 from reframe.core.buildsystems import BuildSystemField
 from reframe.core.containers import ContainerPlatform
 from reframe.core.deferrable import (_DeferredExpression,
@@ -41,6 +42,7 @@ from reframe.core.environments import Environment
 from reframe.core.exceptions import (BuildError, DependencyError,
                                      PerformanceError, PipelineError,
                                      SanityError, SkipTestError,
+                                     ExpectedFailureError,
                                      ReframeSyntaxError)
 from reframe.core.meta import RegressionTestMeta
 from reframe.core.schedulers import Job
@@ -733,9 +735,11 @@ class RegressionTest(RegressionMixin, jsonext.JSONSerializable):
     #:     .. versionchanged:: 4.0.0
     #:        Deferrable expressions are not allowed in reference tuples.
     reference = variable(
+        XFailReference,
         typ.Tuple[~Deferrable, ~Deferrable, ~Deferrable],
-        typ.Dict[str, typ.Dict[str, typ.Tuple[~Deferrable, ~Deferrable,
-                                              ~Deferrable, ~Deferrable]]],
+        typ.Dict[str, typ.Dict[
+            str, typ.Tuple[~Deferrable, ~Deferrable, ~Deferrable, ~Deferrable]
+        ] | XFailReference],
         field=fields.ScopedDictField, value={}, loggable=False
     )
 
@@ -2272,9 +2276,17 @@ class RegressionTest(RegressionMixin, jsonext.JSONSerializable):
             return
 
         with osext.change_dir(self._stagedir):
-            success = sn.evaluate(self.sanity_patterns)
-            if not success:
-                raise SanityError()
+            try:
+                success = sn.evaluate(self.sanity_patterns)
+            except SanityError:
+                expected, message = self.__rfm_xfail_sanity__()
+                if not expected:
+                    raise
+                else:
+                    raise ExpectedFailureError(message)
+            else:
+                if not success:
+                    raise SanityError()
 
     def is_performance_check(self):
         '''Return :obj:`True` if the test is a performance test.'''
@@ -2328,6 +2340,7 @@ class RegressionTest(RegressionMixin, jsonext.JSONSerializable):
                                                                         unit)
 
         # Evaluate the performance function and retrieve the metrics
+        xfailures = {}
         with osext.change_dir(self._stagedir):
             for tag, expr in self.perf_variables.items():
                 try:
@@ -2343,6 +2356,9 @@ class RegressionTest(RegressionMixin, jsonext.JSONSerializable):
                 key = f'{self._current_partition.fullname}:{tag}'
                 try:
                     ref = self.reference[key]
+                    if isinstance(ref, XFailReference):
+                        xfailures[key] = ref.message
+                        ref = ref.data
 
                     # If units are also provided in the reference, raise
                     # a warning if they match with the units provided by
@@ -2395,8 +2411,11 @@ class RegressionTest(RegressionMixin, jsonext.JSONSerializable):
                              '(l={2}, u={3})'))
                 )
             except SanityError as e:
-                errors.append(e.message)
-                self._perfvalues[key][-1] = 'fail'
+                if key in xfailures:
+                    self._perfvalues[key][-1] = 'xfail'
+                else:
+                    errors.append(e.message)
+                    self._perfvalues[key][-1] = 'fail'
             else:
                 self._perfvalues[key][-1] = 'pass'
 
@@ -2410,6 +2429,10 @@ class RegressionTest(RegressionMixin, jsonext.JSONSerializable):
                 msg += ' '
 
             raise PerformanceError(msg + '\n\t'.join(errors))
+
+        # Raise an `ExpectedFailureError` in case of expected failures
+        if xfailures:
+            raise ExpectedFailureError(', '.join(xfailures.values()))
 
     def _copy_job_files(self, job, dst):
         if job is None:
@@ -2654,6 +2677,9 @@ class RegressionTest(RegressionMixin, jsonext.JSONSerializable):
     def __rfm_json_decode__(self, json):
         # 'tags' are decoded as list, so we convert them to a set
         self.tags = set(json['tags'])
+
+    def __rfm_xfail_sanity__(self):
+        return False, ''
 
 
 class RunOnlyRegressionTest(RegressionTest, special=True):
