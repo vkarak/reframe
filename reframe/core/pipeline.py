@@ -41,6 +41,7 @@ from reframe.core.environments import Environment
 from reframe.core.exceptions import (BuildError, DependencyError,
                                      PerformanceError, PipelineError,
                                      SanityError, SkipTestError,
+                                     ExpectedFailureError,
                                      ReframeSyntaxError)
 from reframe.core.meta import RegressionTestMeta
 from reframe.core.schedulers import Job
@@ -2272,9 +2273,17 @@ class RegressionTest(RegressionMixin, jsonext.JSONSerializable):
             return
 
         with osext.change_dir(self._stagedir):
-            success = sn.evaluate(self.sanity_patterns)
-            if not success:
-                raise SanityError()
+            try:
+                success = sn.evaluate(self.sanity_patterns)
+            except SanityError:
+                expected, message = self.__rfm_xfail_sanity__()
+                if not expected:
+                    raise
+                else:
+                    raise ExpectedFailureError(message)
+            else:
+                if not success:
+                    raise SanityError()
 
     def is_performance_check(self):
         '''Return :obj:`True` if the test is a performance test.'''
@@ -2654,6 +2663,9 @@ class RegressionTest(RegressionMixin, jsonext.JSONSerializable):
     def __rfm_json_decode__(self, json):
         # 'tags' are decoded as list, so we convert them to a set
         self.tags = set(json['tags'])
+
+    def __rfm_xfail_sanity__(self):
+        return False
 
 
 class RunOnlyRegressionTest(RegressionTest, special=True):

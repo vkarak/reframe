@@ -190,6 +190,9 @@ class SerialExecutionPolicy(ExecutionPolicy, TaskEventListener):
         msg = f'{task.info()}'
         self.printer.status('ABORT', msg, just='right')
 
+    def on_task_xfailure(self, task):
+        pass
+
     def on_task_failure(self, task):
         self._num_failed_tasks += 1
         msg = f'{task.info()}'
@@ -451,7 +454,7 @@ class AsynchronousExecutionPolicy(ExecutionPolicy, TaskEventListener):
         if self.deps_skipped(task):
             try:
                 raise SkipTestError('skipped due to skipped dependencies')
-            except SkipTestError as e:
+            except SkipTestError:
                 task.skip()
                 self._current_tasks.remove(task)
                 return 1
@@ -611,6 +614,9 @@ class AsynchronousExecutionPolicy(ExecutionPolicy, TaskEventListener):
     def on_task_abort(self, task):
         msg = f'{task.info()}'
         self.printer.status('ABORT', msg, just='right')
+
+    def on_task_xfailure(self, task):
+        pass
 
     def on_task_failure(self, task):
         self._num_failed_tasks += 1
