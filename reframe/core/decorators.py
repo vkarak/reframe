@@ -7,7 +7,7 @@
 # Decorators used for the definition of tests
 #
 
-__all__ = ['simple_test']
+__all__ = ['simple_test', 'xfail']
 
 import collections
 import inspect
@@ -202,3 +202,14 @@ def simple_test(cls):
             _register_test(cls, variant_num=n)
 
     return cls
+
+
+def xfail(message, predicate):
+    def _xfail_fn(obj):
+        return predicate(obj), message
+
+    def _deco(cls):
+        cls.__rfm_xfail_sanity__ = _xfail_fn
+        return cls
+
+    return _deco
