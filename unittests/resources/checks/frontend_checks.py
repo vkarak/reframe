@@ -77,7 +77,7 @@ class SanityFailureCheck(BaseFrontendCheck):
 class PerformanceFailureCheck(BaseFrontendCheck):
     reference = {
         '*': {
-            'perf': (20, -0.1, 0.1, 'Gflop/s')
+            'perf': xfail('bug 123', (20, -0.1, 0.1, 'Gflop/s'))
         }
     }
 

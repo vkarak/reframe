@@ -8,6 +8,8 @@
 #
 
 import functools
+from collections import namedtuple
+
 import reframe.core.parameters as parameters
 import reframe.core.variables as variables
 import reframe.core.fixtures as fixtures
@@ -221,3 +223,10 @@ def loggable_as(name):
 
 loggable = loggable_as(None)
 loggable.__doc__ = '''Equivalent to :func:`loggable_as(None) <loggable_as>`.'''
+
+XFailReference = namedtuple('XFailReference', ['message', 'data'])
+
+
+def xfailref(msg, ref):
+    '''Mark a reference as an expected failure.'''
+    return XFailReference(message=msg, data=ref)

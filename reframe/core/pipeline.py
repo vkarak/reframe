@@ -33,6 +33,7 @@ import reframe.utility.sanity as sn
 import reframe.utility.typecheck as typ
 import reframe.utility.udeps as udeps
 from reframe.core.backends import getlauncher, getscheduler
+from reframe.core.builtins import XFailReference
 from reframe.core.buildsystems import BuildSystemField
 from reframe.core.containers import ContainerPlatform
 from reframe.core.deferrable import (_DeferredExpression,
@@ -2337,6 +2338,7 @@ class RegressionTest(RegressionMixin, jsonext.JSONSerializable):
                                                                         unit)
 
         # Evaluate the performance function and retrieve the metrics
+        xfailures = {}
         with osext.change_dir(self._stagedir):
             for tag, expr in self.perf_variables.items():
                 try:
@@ -2352,6 +2354,9 @@ class RegressionTest(RegressionMixin, jsonext.JSONSerializable):
                 key = f'{self._current_partition.fullname}:{tag}'
                 try:
                     ref = self.reference[key]
+                    if isinstance(ref, XFailReference):
+                        xfailures[key] = ref.message
+                        ref = ref.data
 
                     # If units are also provided in the reference, raise
                     # a warning if they match with the units provided by
@@ -2404,8 +2409,12 @@ class RegressionTest(RegressionMixin, jsonext.JSONSerializable):
                              '(l={2}, u={3})'))
                 )
             except SanityError as e:
-                errors.append(e.message)
-                self._perfvalues[key][-1] = 'fail'
+                if key in xfailures:
+                    # errors.append(ExpectedFailureError(xfailures[key]))
+                    self._perfvalues[key][-1] = 'xfail'
+                else:
+                    errors.append(e.message)
+                    self._perfvalues[key][-1] = 'fail'
             else:
                 self._perfvalues[key][-1] = 'pass'
 
