@@ -2054,7 +2054,7 @@ def test_hashcode():
     class _X0(rfm.RunOnlyRegressionTest):
         p = parameter([1])
 
-    class _X0(rfm.RunOnlyRegressionTest):
+    class _X0(rfm.RunOnlyRegressionTest):   # noqa: F811
         p = parameter([2])
 
     _X1 = _X0
