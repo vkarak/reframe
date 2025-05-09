@@ -205,6 +205,30 @@ def simple_test(cls):
 
 
 def xfail(message, predicate):
+    '''Mark a test as an expected failure in sanity checking.
+
+    If you want mark an expected performance failure, take a look at the
+    :func:`~reframe.core.builtins.xfail` builtin.
+
+    If a marked test passes sanity checking, then it will be marked as a
+    failure.
+
+    :arg message: the message to be printed when this test fails expectedly.
+    :arg predicate: A callable taking the test instance as its sole argument
+        and returning :obj:`True` or :obj:`False`. If it returns :obj:`True`,
+        then the test is marked as an expected failure, otherwise not. For
+        example, the following test will only be marked as an expected failure
+        only if variable ``x`` equals 1.
+
+        .. code-block:: python
+
+            @rfm.xfail('bug 123', lambda test: return test.x == 1)
+            @rfm.simple_test
+            class MyTest(...):
+                x = variable(int, value=0)
+
+    .. versionadded:: 4.9
+    '''
     def _xfail_fn(obj):
         return predicate(obj), message
 

@@ -1423,6 +1423,13 @@ Note that we are using another configuration file, which defines an MPI-enabled 
    You should adapt them if running on an actual parallel cluster.
 
 
+Marking expected failures
+=========================
+
+.. versionadded:: 4.9
+
+
+
 Managing the run session
 ========================
 

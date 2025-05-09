@@ -33,7 +33,7 @@ import reframe.utility.sanity as sn
 import reframe.utility.typecheck as typ
 import reframe.utility.udeps as udeps
 from reframe.core.backends import getlauncher, getscheduler
-from reframe.core.builtins import XFailReference
+from reframe.core.builtins import _XFailReference
 from reframe.core.buildsystems import BuildSystemField
 from reframe.core.containers import ContainerPlatform
 from reframe.core.deferrable import (_DeferredExpression,
@@ -66,7 +66,7 @@ class _NoRuntime(ContainerPlatform):
 
 # Meta-type to use for type checking in some variables
 Deferrable = typ.make_meta_type('Deferrable', _DeferredExpression)
-XfailRef = typ.make_meta_type('XfailRef', XFailReference)
+XfailRef = typ.make_meta_type('XfailRef', _XFailReference)
 
 
 # Valid systems/environments mini-language
@@ -697,7 +697,7 @@ class RegressionTest(RegressionMixin, jsonext.JSONSerializable):
     #:        },
     #:        'sys0:part1': {
     #:            'perfvar0': (100, -0.1, 0.1, 'Gflop/s'),
-    #:            'perfvar1': (40, -0.1, 0.1, 'GB/s')
+    #:            'perfvar1':  (40, -0.1, 0.1, 'GB/s')
     #:        }
     #:    }
     #:
@@ -721,9 +721,45 @@ class RegressionTest(RegressionMixin, jsonext.JSONSerializable):
     #: obtained performance value to assess whether the test
     #: passes or fails the performance check.
     #:
+    #: Marking expected failures
+    #: -------------------------
+    #:
+    #: You can mark any performance reference tuple as an expected failure
+    #: using the :func:`~reframe.core.builtins.xfail` builtin as follows:
+    #:
+    #: .. code-block:: python
+    #:
+    #:     self.reference = {
+    #:         'sys0:part0': {
+    #:             'perfvar0': xfail('bug 123', (50, -0.1, 0.1, 'Gflop/s')),
+    #:             'perfvar1': (20, -0.1, 0.1, 'GB/s')
+    #:         }
+    #:     }
+    #:
+    #: If the test fails in ``perfvar0`` then this will be marked as an
+    #: expected failure and the message `"bug 123"` will be printed. If it
+    #: passes, it will be marked as an unexpected pass and the test will be
+    #: counted as a failure.
+    #:
+    #: Α test may contain references for multiple performance variables, some
+    #: of which may be marked as expected failures. The following rules govern
+    #: the outcome of the test:
+    #:
+    #: - If any performance variable fails, regardless of how the rest are
+    #:   marked, then the test is a failure and its state is ``FAIL``.
+    #: - If any performance variable that is marked as an expected failure
+    #:   passes, then the test is a failure and its state is ``XPASS``.
+    #: - If all performance variables that are marked as expected failures fail
+    #:   and all the rest pass, then the test is successful and its state is
+    #:   ``XFAIL``.
+    #: - If all performance variables pass and none of them is marked as an
+    #:   expected failure, then the test is successful and its state is
+    #:   ``PASS``.
+    #:
     #: :type: A scoped dictionary with system names as scopes, performance
     #:   variables as keys and reference tuples as values.
     #:   The elements of reference tuples cannot be deferrable expressions.
+    #: :default: ``{}``
     #:
     #: .. note::
     #:     .. versionchanged:: 3.0
@@ -736,6 +772,13 @@ class RegressionTest(RegressionMixin, jsonext.JSONSerializable):
     #:
     #:     .. versionchanged:: 4.0.0
     #:        Deferrable expressions are not allowed in reference tuples.
+    #:
+    #:     .. versionchanged:: 4.8
+    #:        Treat thresholds as absolute values when reference is zero.
+    #:
+    #:     .. versionchanged:: 4.9
+    #:        Support marking reference tuples as expected failures.
+    #:
     reference = variable(
         typ.Tuple[~Deferrable, ~Deferrable, ~Deferrable] | XfailRef,
         typ.Dict[str, typ.Dict[
@@ -2361,7 +2404,7 @@ class RegressionTest(RegressionMixin, jsonext.JSONSerializable):
                 key = f'{self._current_partition.fullname}:{tag}'
                 try:
                     ref = self.reference[key]
-                    if isinstance(ref, XFailReference):
+                    if isinstance(ref, _XFailReference):
                         xfailures[key] = ref.message
                         ref = ref.data
 

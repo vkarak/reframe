@@ -1860,9 +1860,9 @@ def test_perf_expected_failures(perftest, sanity_file, perf_file,
         elif status == 'fail':
             return (5, 0, 0)
         elif status == 'xpass':
-            return builtins.xfailref('bug 123', (10, 0, 0))
+            return builtins.xfail('bug 123', (10, 0, 0))
         elif status == 'xfail':
-            return builtins.xfailref('bug 456', (5, 0, 0))
+            return builtins.xfail('bug 456', (5, 0, 0))
 
         assert 0, 'unknown perf status'
 
