@@ -6,6 +6,7 @@
 import json
 import jsonschema
 import os
+import polars as pl
 import pytest
 import sys
 import time
@@ -227,28 +228,54 @@ def test_parse_cmp_spec_period(time_period):
 
 
 @pytest.fixture(params=['first', 'last', 'mean', 'median',
-                        'min', 'max', 'count'])
+                        'min', 'max', 'std', 'stats'])
 def aggregator(request):
     return request.param
 
 
 def test_parse_cmp_spec_aggregations(aggregator):
     match = parse_cmp_spec(f'now-1m:now/now-1d:now/{aggregator}:/')
-    data = [1, 2, 3, 4, 5]
+    num_recs = 10
+    nodelist = [f'nid{i}' for i in range(num_recs)]
+    df = pl.DataFrame({
+        'name': ['test' for i in range(num_recs)],
+        'pvar': ['time' for i in range(num_recs)],
+        'unit': ['s' for i in range(num_recs)],
+        'pval': [1 + i/10 for i in range(num_recs)],
+        'node': nodelist
+    })
+    agg = df.group_by('name').agg(match.aggregation.col_spec(['node']))
+    assert set(agg['node'][0].split('|')) == set(nodelist)
     if aggregator == 'first':
-        match.aggregator(data) == data[0]
+        assert 'pval (first)' in agg.columns
+        assert agg['pval (first)'][0] == 1
     elif aggregator == 'last':
-        match.aggregator(data) == data[-1]
+        assert 'pval (last)' in agg.columns
+        assert agg['pval (last)'][0] == 1.9
     elif aggregator == 'min':
-        match.aggregator(data) == 1
+        assert 'pval (min)' in agg.columns
+        assert agg['pval (min)'][0] == 1
     elif aggregator == 'max':
-        match.aggregator(data) == 5
+        assert 'pval (max)' in agg.columns
+        assert agg['pval (max)'][0] == 1.9
     elif aggregator == 'median':
-        match.aggregator(data) == 3
+        assert 'pval (median)' in agg.columns
+        assert agg['pval (median)'][0] == 1.45
     elif aggregator == 'mean':
-        match.aggregator(data) == sum(data) / len(data)
-    elif aggregator == 'count':
-        match.aggregator(data) == len(data)
+        assert 'pval (mean)' in agg.columns
+        assert agg['pval (mean)'][0] == 1.45
+    elif aggregator == 'std':
+        assert 'pval (stddev)' in agg.columns
+    elif aggregator == 'stats':
+        assert 'pval (min)' in agg.columns
+        assert 'pval (p01)' in agg.columns
+        assert 'pval (p05)' in agg.columns
+        assert 'pval (median)' in agg.columns
+        assert 'pval (p95)' in agg.columns
+        assert 'pval (p99)' in agg.columns
+        assert 'pval (max)' in agg.columns
+        assert 'pval (mean)' in agg.columns
+        assert 'pval (stddev)' in agg.columns
 
     # Check variant without base period
     match = parse_cmp_spec(f'now-1d:now/{aggregator}:/')
@@ -422,7 +449,6 @@ def test_parse_cmp_spec_invalid_extra_cols(invalid_col_spec):
 @pytest.fixture(params=['now-1d:now',
                         'now-1m:now/now-1d:now',
                         'now-1m:now/now-1d:now/mean',
-                        'now-1m:now/now-1d:now/mean:',
                         'now-1m:now/now-1d:now/mean:',
                         '/now-1d:now/mean:/',
                         'now-1m:now//mean:'])

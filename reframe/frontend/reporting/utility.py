@@ -4,12 +4,14 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import abc
+import polars as pl
 import re
 import statistics
 import types
 from collections import namedtuple
 from datetime import datetime, timedelta, timezone
 from numbers import Number
+from reframe.core.logging import getlogger
 
 
 class Aggregator:
@@ -96,6 +98,69 @@ class AggrCount(Aggregator):
             count += 1
 
         return count
+
+
+class Aggregation:
+    OP_REGEX = re.compile(r'(?P<op>\S+)\((?P<col>\S+)\)|(?P<op2>\S+)')
+    OP_VALID = {'min', 'max', 'median', 'mean', 'std',
+                'first', 'last', 'stats'}
+
+    def __init__(self, agg_spec):
+        self._aggregations = []
+        for agg in agg_spec.split(','):
+            m = self.OP_REGEX.match(agg)
+            if m:
+                op = m.group('op') or m.group('op2')
+                col = m.group('col') or 'pval'
+                self._aggregations.append((op, col))
+                if op not in self.OP_VALID:
+                    raise ValueError(f'unknown aggregation: {op}')
+            else:
+                raise ValueError(f'invalid aggregation spec: {agg}')
+
+    def __repr__(self):
+        return f'Aggregation({self._aggregations})'
+
+    def col_spec(self, extra_cols):
+        specs = []
+        for op, col in self._aggregations:
+            if op == 'min':
+                specs.append(pl.col(col).min().alias(f'{col} (min)'))
+            elif op == 'max':
+                specs.append(pl.col(col).max().alias(f'{col} (max)'))
+            elif op == 'median':
+                specs.append(pl.col(col).median().alias(f'{col} (median)'))
+            elif op == 'mean':
+                specs.append(pl.col(col).mean().alias(f'{col} (mean)'))
+            elif op == 'std':
+                specs.append(pl.col(col).std().alias(f'{col} (stddev)'))
+            elif op == 'first':
+                specs.append(pl.col(col).first().alias(f'{col} (first)'))
+            elif op == 'last':
+                specs.append(pl.col(col).last().alias(f'{col} (last)'))
+            elif op == 'stats':
+                specs += [
+                    pl.col(col).min().alias(f'{col} (min)'),
+                    pl.col(col).quantile(0.01).alias(f'{col} (p01)'),
+                    pl.col(col).quantile(0.05).alias(f'{col} (p05)'),
+                    pl.col(col).quantile(0.50).alias(f'{col} (median)'),
+                    pl.col(col).quantile(0.95).alias(f'{col} (p95)'),
+                    pl.col(col).quantile(0.99).alias(f'{col} (p99)'),
+                    pl.col(col).max().alias(f'{col} (max)'),
+                    pl.col(col).mean().alias(f'{col} (mean)'),
+                    pl.col(col).std().alias(f'{col} (stddev)')
+                ]
+
+        # Add col specs for the extra columns requested
+        for col in extra_cols:
+            if col == 'pval':
+                continue
+            elif col == 'psamples':
+                specs.append(pl.len().alias('psamples'))
+            else:
+                specs.append(pl.col(col).unique().str.join('|'))
+
+        return specs
 
 
 def _parse_timestamp(s):
@@ -237,7 +302,8 @@ def _parse_aggregation(s, base_columns=None):
     except ValueError:
         raise ValueError(f'invalid aggregate function spec: {s}') from None
 
-    return Aggregator.create(op), _parse_columns(group_cols, base_columns)
+    # return Aggregator.create(op), _parse_columns(group_cols, base_columns)
+    return Aggregation(op), _parse_columns(group_cols, base_columns)
 
 
 def parse_query_spec(s):
@@ -259,7 +325,7 @@ def parse_query_spec(s):
 
 
 _Match = namedtuple('_Match',
-                    ['base', 'target', 'aggregator', 'groups', 'columns'])
+                    ['base', 'target', 'aggregation', 'groups', 'columns'])
 
 DEFAULT_GROUP_BY = ['name', 'sysenv', 'pvar', 'punit']
 DEFAULT_EXTRA_COLS = ['pval', 'pdiff']
@@ -276,10 +342,13 @@ def parse_cmp_spec(spec, default_group_by=None, default_extra_cols=None):
     else:
         raise ValueError(f'invalid cmp spec: {spec}')
 
+    # import pdb
+    # pdb.set_trace()
+
     base = parse_query_spec(base_spec)
     target = parse_query_spec(target_spec)
-    aggr_fn, group_cols = _parse_aggregation(aggr, default_group_by)
+    aggr, group_cols = _parse_aggregation(aggr, default_group_by)
 
     # Update base columns for listing
     columns = _parse_columns(cols, group_cols + default_extra_cols)
-    return _Match(base, target, aggr_fn, group_cols, columns)
+    return _Match(base, target, aggr, group_cols, columns)

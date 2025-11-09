@@ -11,6 +11,7 @@ import jsonschema
 import lxml.etree as etree
 import math
 import os
+import polars as pl
 import re
 import socket
 import time
@@ -569,9 +570,18 @@ class _TCProxy(UserDict):
 
         if include_only is not None:
             self.data = {}
-            for k in include_only + self._required_keys:
-                if k in testcase:
-                    self.data.setdefault(k, testcase[k])
+            for key in include_only + self._required_keys:
+                # Computed attributes
+                if key == 'basename':
+                    val = testcase['name'].split()[0]
+                elif key == 'sysenv':
+                    val = _format_sysenv(testcase['system'],
+                                         testcase['partition'],
+                                         testcase['environ'])
+                else:
+                    val = testcase.get(key)
+
+                self.data.setdefault(key, val)
         else:
             self.data = testcase
 
@@ -582,17 +592,17 @@ class _TCProxy(UserDict):
 
         return val
 
-    def __missing__(self, key):
-        if key == 'basename':
-            return self.data['name'].split()[0]
-        elif key == 'sysenv':
-            return _format_sysenv(self.data['system'],
-                                  self.data['partition'],
-                                  self.data['environ'])
-        elif key == 'pdiff':
-            return None
-        else:
-            raise KeyError(key)
+    # def __missing__(self, key):
+    #     if key == 'basename':
+    #         return self.data['name'].split()[0]
+    #     elif key == 'sysenv':
+    #         return _format_sysenv(self.data['system'],
+    #                               self.data['partition'],
+    #                               self.data['environ'])
+    #     elif key == 'pdiff':
+    #         return None
+    #     else:
+    #         raise KeyError(key)
 
 
 def _group_key(groups, testcase: _TCProxy):
@@ -675,88 +685,85 @@ def _aggregate_perf(grouped_testcases, aggr_fn, cols):
 
 
 @time_function
-def compare_testcase_data(base_testcases, target_testcases, base_fn, target_fn,
-                          groups=None, columns=None):
-    groups = groups or []
+def _create_dataframe(testcases, groups, columns):
+    record_cols = list(OrderedSet(groups) | OrderedSet(columns))
+    data = []
+    for tc in map(_TCProxy, testcases):
+        for pvar, reftuple in tc['perfvalues'].items():
+            pvar = pvar.split(':')[-1]
+            pval, pref, plower, pupper, punit, *presult = reftuple
+            if pval is None:
+                # Ignore `None` performance values
+                # (performance tests that failed sanity)
+                continue
 
-    # Clean up columns and store those for which we want explicitly the A or B
-    # variants
-    cols = []
-    variants_A = set()
-    variants_B = set()
-    for c in columns:
-        if c.endswith('_A'):
-            variants_A.add(c[:-2])
-            cols.append(c[:-2])
-        elif c.endswith('_B'):
-            variants_B.add(c[:-2])
-            cols.append(c[:-2])
-        else:
-            variants_A.add(c)
-            variants_B.add(c)
-            cols.append(c)
+            # `presult` was not present in report schema < 4.1, so we need
+            # to treat this case properly
+            presult = presult[0] if presult else None
+            plower = pref * (1 + plower) if plower is not None else -math.inf
+            pupper = pref * (1 + pupper) if pupper is not None else math.inf
+            record = _TCProxy(tc, include_only=record_cols)
+            record.update({
+                'pvar': pvar,
+                'pval': pval,
+                'pref': pref,
+                'plower': plower,
+                'pupper': pupper,
+                'punit': punit,
+                'presult': presult
+            })
+            data.append(record)
 
-    grouped_base = _group_testcases(base_testcases, groups, cols)
-    grouped_target = _group_testcases(target_testcases, groups, cols)
-    pbase = _aggregate_perf(grouped_base, base_fn, cols)
-    ptarget = _aggregate_perf(grouped_target, target_fn, cols)
+    return pl.DataFrame(data)
 
-    # For visual purposes if `name` is in `groups`, consider also its
-    # derivative `basename` to be in, so as to avoid duplicate columns
-    if 'name' in groups:
-        groups.append('basename')
 
-    # Build the final table data
-    extra_cols = set(cols) - set(groups) - {'pdiff'}
+@time_function
+def _aggregate_data(testcases, query):
+    extra_cols = OrderedSet(query.columns) - OrderedSet(query.groups)
+    df = _create_dataframe(testcases, query.groups, query.columns)
+    df.group_by(query.groups).agg(
+        query.aggregation.col_spec(extra_cols)
+    ).sort(df.columns[0])
+    return df
 
-    # Header line
-    header = []
-    for c in cols:
-        if c in extra_cols:
-            if c in variants_A:
-                header.append(f'{c}_A')
 
-            if c in variants_B:
-                header.append(f'{c}_B')
-        else:
-            header.append(c)
+@time_function
+def compare_testcase_data(base_testcases, target_testcases, query):
+    class _QStripped:
+        '''A query wrapper that strips off column suffixes'''
+        def __init__(self, query):
+            self.__query = query
 
-    data = [header]
-    for key, aggr_data in pbase.items():
-        pdiff = None
-        line = []
-        for c in cols:
-            base = aggr_data.get(c)
-            try:
-                target = ptarget[key][c]
-            except KeyError:
-                target = None
+        def __getattr__(self, name):
+            '''Delegate any failed attribute lookup to the underlying query'''
+            return getattr(self.__query, name)
 
-            if c == 'pval':
-                line.append('n/a' if base is None else base)
-                line.append('n/a' if target is None else target)
+        @property
+        def columns(self):
+            return [
+                col[:-2] if col.endswith('_A') or col.endswith('_B') else col
+                for col in self.__query.columns
+            ]
 
-                # compute diff for later usage
-                if base is not None and target is not None:
-                    if base == 0 and target == 0:
-                        pdiff = math.nan
-                    elif target == 0:
-                        pdiff = math.inf
-                    else:
-                        pdiff = (base - target) / target
-                        pdiff = '{:+7.2%}'.format(pdiff)
-            elif c == 'pdiff':
-                line.append('n/a' if pdiff is None else pdiff)
-            elif c in extra_cols:
-                if c in variants_A:
-                    line.append('n/a' if base is None else base)
+    # We need to strip the _A/B column suffixes to perform the actual
+    # as these are only relevant for the join below
+    q_stripped = _QStripped(query)
+    extra_cols = OrderedSet(q_stripped.columns) - OrderedSet(q_stripped.groups)
+    df_base = _aggregate_data(base_testcases, q_stripped).with_columns(
+        pl.col(extra_cols).name.suffix('_A')
+    )
+    df_target = _aggregate_data(target_testcases, q_stripped).with_columns(
+        pl.col(extra_cols).name.suffix('_B')
+    )
+    cols = list(OrderedSet(query.columns) | {'pval_B'})
+    df = df_base.join(df_target, on=query.groups).with_columns(
+        (100*(pl.col('pval_A') - pl.col('pval_B')) / pl.col('pval_B')).round(2)
+        .alias('pdiff')
+    ).select(cols)
 
-                if c in variants_B:
-                    line.append('n/a' if target is None else target)
-            else:
-                line.append('n/a' if base is None else base)
-
-        data.append(line)
+    data = [df.columns]
+    for row in df.iter_rows():
+        data.append(row)
 
     return data
 
@@ -766,10 +773,10 @@ def performance_compare(cmp, report=None, namepatt=None,
                         filterA=None, filterB=None):
     with reraise_as(ReframeError, (ValueError,),
                     'could not parse comparison spec'):
-        match = parse_cmp_spec(cmp)
+        query = parse_cmp_spec(cmp)
 
     backend = StorageBackend.default()
-    if match.base is None:
+    if query.base is None:
         if report is None:
             raise ValueError('report cannot be `None` '
                              'for current run comparisons')
@@ -785,11 +792,10 @@ def performance_compare(cmp, report=None, namepatt=None,
         except IndexError:
             tcs_base = []
     else:
-        tcs_base = backend.fetch_testcases(match.base, namepatt, filterA)
+        tcs_base = backend.fetch_testcases(query.base, namepatt, filterA)
 
-    tcs_target = backend.fetch_testcases(match.target, namepatt, filterB)
-    return compare_testcase_data(tcs_base, tcs_target, match.aggregator,
-                                 match.aggregator, match.groups, match.columns)
+    tcs_target = backend.fetch_testcases(query.target, namepatt, filterB)
+    return compare_testcase_data(tcs_base, tcs_target, query)
 
 
 @time_function
@@ -837,22 +843,20 @@ def session_data(query):
 def testcase_data(spec, namepatt=None, test_filter=None):
     with reraise_as(ReframeError, (ValueError,),
                     'could not parse comparison spec'):
-        match = parse_cmp_spec(spec, default_extra_cols=['pval'])
+        query = parse_cmp_spec(spec, default_extra_cols=['pval'])
 
-    if match.base is not None:
+    if query.base is not None:
         raise ReframeError('only one time period or session are allowed: '
                            'if you want to compare performance, '
                            'use the `--performance-compare` option')
 
     storage = StorageBackend.default()
-    testcases = storage.fetch_testcases(match.target, namepatt, test_filter)
-    aggregated = _aggregate_perf(
-        _group_testcases(testcases, match.groups, match.columns),
-        match.aggregator, match.columns
+    df = _aggregate_data(
+        storage.fetch_testcases(query.target, namepatt, test_filter), query
     )
-    data = [match.columns]
-    for aggr_data in aggregated.values():
-        data.append([aggr_data[c] for c in match.columns])
+    data = [df.columns]
+    for row in df.iter_rows():
+        data.append(row)
 
     return data
 
