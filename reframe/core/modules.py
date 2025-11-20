@@ -112,9 +112,6 @@ class ModulesSystem:
         modules_impl = {
             None: NoModImpl,
             'nomod': NoModImpl,
-            'tmod31': TMod31Impl,
-            'tmod': TModImpl,
-            'tmod32': TModImpl,
             'tmod4': TMod4Impl,
             'lmod': LModImpl,
             'spack': SpackImpl
@@ -727,96 +724,6 @@ class TModImpl(ModulesSystemImpl):
 
     def emit_unload_instr(self, module):
         return [f'module unload {module}']
-
-
-class TMod31Impl(TModImpl):
-    '''Module system for TMod (Tcl).'''
-
-    MIN_VERSION = (3, 1)
-
-    def __init__(self):
-        self._version = None
-        self._command = None
-        self._validated = False
-        if self.validate:
-            self._do_validate()
-
-    def _do_validate(self):
-        # Try to figure out if we are indeed using the TCL version
-        try:
-            modulecmd = os.getenv('MODULESHOME')
-            modulecmd = os.path.join(modulecmd, 'modulecmd.tcl')
-            completed = osext.run_command(modulecmd)
-        except OSError as e:
-            raise ConfigError(
-                f'could not find a sane TMod31 installation: {e}'
-            ) from e
-
-        version_match = re.search(r'Release Tcl (\S+)', completed.stderr,
-                                  re.MULTILINE)
-        tcl_version_match = version_match
-
-        if version_match is None or tcl_version_match is None:
-            raise ConfigError('could not find a sane TMod31 installation')
-
-        version = version_match.group(1)
-        try:
-            ver_major, ver_minor = [int(v) for v in version.split('.')[:2]]
-        except ValueError:
-            raise ConfigError(
-                'could not parse TMod31 version string: ' + version) from None
-
-        if (ver_major, ver_minor) < self.MIN_VERSION:
-            raise ConfigError(
-                f'unsupported TMod version: {version} '
-                f'(required >= {self.MIN_VERSION})'
-            )
-
-        self._version = version
-        self._command = f'{modulecmd} python'
-        try:
-            # Try the Python bindings now
-            completed = osext.run_command(self._command)
-        except OSError as e:
-            raise ConfigError(
-                f'could not get the Python bindings for TMod31: {e}'
-            )
-
-        if re.search(r'Unknown shell type', completed.stderr):
-            raise ConfigError(
-                'Python is not supported by this TMod installation'
-            )
-
-        self._validated = True
-
-    def name(self):
-        return 'tmod31'
-
-    def modulecmd(self, *args):
-        return ' '.join([self._command, *args])
-
-    def _execute(self, cmd, *args):
-        if not self._validated:
-            self._do_validate()
-
-        modulecmd = self.modulecmd(cmd, *args)
-        completed = osext.run_command(modulecmd)
-        if re.search(r'\bERROR\b', completed.stderr) is not None:
-            raise SpawnedProcessError(modulecmd,
-                                      completed.stdout,
-                                      completed.stderr,
-                                      completed.returncode)
-
-        exec_match = re.search(r"^exec\s'(\S+)'", completed.stdout,
-                               re.MULTILINE)
-        if exec_match is None:
-            raise ConfigError('could not use the python bindings')
-
-        with open(exec_match.group(1), 'r') as content_file:
-            cmd = content_file.read()
-
-        exec(self.process(cmd))
-        return completed.stderr
 
 
 class TMod4Impl(TModImpl):
