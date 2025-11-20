@@ -33,10 +33,7 @@ class time_region:
 class TimeProfiler:
     def __init__(self):
         self._region_stack = ['root']
-        if sys.version_info[:2] < (3, 8):
-            self._region_times = OrderedDict()
-        else:
-            self._region_times = {}
+        self._region_times = {}
 
     @property
     def current_region(self):
