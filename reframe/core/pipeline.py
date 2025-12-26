@@ -15,16 +15,15 @@ __all__ = [
 
 import glob
 import hashlib
+import functools
 import inspect
 import itertools
 import numbers
 import os
 import shutil
+from collections import UserDict
 from pathlib import Path
 
-import reframe.core.fields as fields
-import reframe.core.hooks as hooks
-import reframe.core.logging as logging
 import reframe.core.runtime as rt
 import reframe.utility as util
 import reframe.utility.jsonext as jsonext
@@ -45,9 +44,12 @@ from reframe.core.exceptions import (BuildError, DependencyError,
                                      ExpectedFailureError,
                                      UnexpectedSuccessError,
                                      ReframeError)
+from reframe.core.hooks import attach_hooks
+from reframe.core.logging import getlogger
 from reframe.core.meta import RegressionTestMeta
 from reframe.core.schedulers import Job
 from reframe.core.warnings import user_deprecation_warning
+from reframe.utility import ScopedDict
 
 
 class _NoRuntime(ContainerPlatform):
@@ -162,6 +164,182 @@ class RegressionMixin(RegressionTestPlugin):
             '`RegressionMixin` is deprecated; '
             'please inherit from `RegresssionTestPlugin` instead'
         )
+
+
+class _DefaultDict(UserDict):
+    '''Same as `collections.defaultdict` except that `default_factory` callback
+    accepts the missing key as an argument'''
+    def __init__(self, default_factory=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._default_factory = default_factory
+
+    def __missing__(self, key):
+        if self._default_factory:
+            return self._default_factory(key)
+
+        raise KeyError(key)
+
+
+class RegressionTestDict(UserDict):
+    '''A multi-level dictionary indexed on test attributes.
+
+    This is a dictionary with an arbitrary number of levels. Each level's keys
+    are a subset of the possible values that a test's attribute can take. At
+    the top-level there is always a special key ``$index``, which determines
+    the test attributes that correspond to each dictionary level. Here is an
+    example:
+
+    .. code-block:: python
+
+        xdict = RegressionTestDict({
+            '$index': ('num_tasks', 'myparam'),
+            8: {
+                'foo': 'xyz',
+                'bar': 'xxx'
+            },
+            16: {
+                'foo': 'abc',
+                'bar': 'aaa'
+            }
+        })
+
+    The `$index` special key is consumed upon the dictionary's construction
+    and it can later be retrieved explicitly through the :attr:`index`
+    property. The dictionary can be queried as any other Python dictionary,
+    e.g., ``xdict[16]["bar"]`` will give "aaa". However, if keyed with a test,
+    it will determine the values of every level based on indexed test
+    attributes. For example,
+
+    .. code-block:: python
+
+        xdict[test]
+
+    is roughly equivalent to
+
+    .. code-block:: python
+
+        xdict[test.num_tasks][test.myparam]
+
+    If the test does not have the requested attribute or its value is not in
+    the multilevel dictionary, a :py:class:`KeyError` will be raised.
+
+    The `$index` of the dictionary can contain the following special attributes
+    which will access information about the current system and environment of
+    the test:
+
+    - ``$system``: equivalent to ``self.current_system.name``
+    - ``$partition`` equivalent to ``self.current_partition.fullname``
+    - ``$processor.<attr>`` equivalent to a
+    ``self.current_partition.processor.<attr>``
+    - `$gpu.<attr>` equivalent to
+    ``self.current_partition.select_devices('gpu')[0].<attr>``
+
+    In case a key is missing, users are allowed to define a test protocol to
+    handle them instead of raising :class:`KeyError`. This is controlled by
+    the ``protocol`` keyword argument of the :class:`RegressionTestDict`'s
+    constructor. The protocol argument s a simple string and once attached, if
+    a key is missing during test-based lookup, the following test callback
+    method will be called, if defined:
+
+    .. code-block:: python
+
+        __<protocol>_missing_<subindex>__(data, key)
+
+    ``data`` is the sub-dictionary at the level of the sub-index and ``key``
+    is the missing key. In case the sub-index has one of the special values
+    above, every special character will be converted to `_` and then the
+    method will be looked up. In the example above, if we constructed the
+    dictionary with ``protocol="proto"``, and tried retrieve its value with a
+    test with ``num_tasks=32``, the following method would be called to
+    retrieve the missing value:
+
+    .. code-block:: python
+
+        test.__proto_missing_num_nodes__(data={
+            8: {
+                'foo': 'xyz',
+                'bar': 'xxx'
+            },
+            16: {
+                'foo': 'abc',
+                'bar': 'aaa'
+            }
+        }, key=32)
+
+    This method should return the missing value or raise :class:`KeyError`.
+    '''
+    def __init__(self, *args, protocol=None, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self._protocol = protocol
+
+        # Remove and store the index separately
+        self._index = self.data.pop('$index', None)
+
+    @property
+    def protocol(self):
+        '''The protocol associated with this dictionary, :obj:`None` otherwise'''
+        return self._protocol
+
+    @property
+    def index(self):
+        '''The index associated with this dictionary, :obj:`None` otherwise'''
+        return self._index
+
+    def reset_index(self):
+        new_index = self.data.pop('$index', None)
+        if new_index:
+            self._index = new_index
+
+    def __getitem__(self, key):
+        if not isinstance(key, RegressionTestPlugin):
+            return super().__getitem__(key)
+
+        if not self._index:
+            raise KeyError(key)
+
+        test = key
+        try:
+            data = self.data
+            for subkey in self._index:
+                # Attach user's callback for missing keys converting also the
+                # special keys
+                if subkey.startswith('$'):
+                    _subkey  = subkey[1:].replace('.', '_')
+                else:
+                    _subkey = subkey
+
+                if self._protocol:
+                    resolve_fn = getattr(test, f'__{self._protocol}_missing_{_subkey}__', None)
+                    if resolve_fn:
+                        data = _DefaultDict(functools.partial(resolve_fn, data), data)
+
+                match subkey.split('.'):
+                    case ['$system']:
+                        data = data[test.current_system.name]
+                    case ['$partition']:
+                        data = data[test.current_partition.fullname]
+                    case ['$processor', attr]:
+                        proc = test.current_partition.processor
+                        data = data[getattr(proc, attr)]
+                    case ['$gpu', attr]:
+                        gpus = test.current_partition.select_devices('gpu')[0]
+                        data = data[getattr(gpus, attr)]
+                    case [attr]:
+                        data = data[getattr(test, attr)]
+        except AttributeError:
+            raise KeyError(subkey) from None
+        else:
+            # If all good, return the final data
+            return data
+
+
+def RegressionTestDictType(*args, **kwargs):
+    class RegressionTestDictWithProto(RegressionTestDict):
+        __init__ = functools.partialmethod(RegressionTestDict.__init__,
+                                           *args, **kwargs)
+
+    return RegressionTestDictWithProto
 
 
 class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
@@ -824,14 +1002,16 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
     #:     .. versionchanged:: 4.9
     #:        Support marking reference tuples as expected failures.
     #:
-    reference = variable(
-        typ.Tuple[~Deferrable, ~Deferrable, ~Deferrable] | XfailRef,
-        typ.Dict[str, typ.Dict[
-            str, typ.Tuple[~Deferrable, ~Deferrable, ~Deferrable, ~Deferrable] | XfailRef
-        ]],
-        XfailRef,
-        field=fields.ScopedDictField, value={}, loggable=False
-    )
+    # reference = variable(
+    #     typ.Tuple[~Deferrable, ~Deferrable, ~Deferrable] | XfailRef,
+    #     typ.Dict[str, typ.Dict[
+    #         str, typ.Tuple[~Deferrable, ~Deferrable, ~Deferrable, ~Deferrable] | XfailRef
+    #     ]],
+    #     XfailRef,
+    #     field=fields.ScopedDictField, value={}, loggable=False
+    # )
+    reference = variable(RegressionTestDictType(protocol='ref'),
+                         value={}, allow_implicit=True, loggable=False)
 
     #: Require that a reference is defined for each system that this test is
     #: run on.
@@ -1272,7 +1452,7 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
 
         pipeline_hooks = cls._rfm_pipeline_hooks
         fn = getattr(cls, stage)
-        new_fn = hooks.attach_hooks(pipeline_hooks)(fn)
+        new_fn = attach_hooks(pipeline_hooks)(fn)
         setattr(cls, '_rfm_pipeline_fn_' + stage, new_fn)
 
     def __getattribute__(self, name):
@@ -1559,7 +1739,7 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
 
         You can use this logger to log information for your test.
         '''
-        return logging.getlogger()
+        return getlogger()
 
     @loggable
     @property
@@ -2389,6 +2569,88 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
         '''Return :obj:`True` if the test is a performance test.'''
         return self.perf_variables or hasattr(self, 'perf_patterns')
 
+    def _load_ref_file(self, filename):
+        def _parse_ref_entry(key, val):
+            try:
+                first = val[0]
+            except (TypeError, IndexError):
+                raise ReferenceParseError(f'{filename}: invalid reference entry {key!r}: {val}')
+
+            match first:
+                case '$xfail':
+                    return xfail(*val[1:-1], tuple(val[-1]))
+                case '$xfail_by_host':
+                    return xfail_by_host(*val[1:-1], tuple(val[-1]))
+                case _:
+                    if isinstance(first, str):
+                        raise ReferenceParseError(
+                            f'{filename}: unknown modifier {first!r} in entry {key!r}: {val}'
+                        )
+
+                    return tuple(val)
+
+        def _entry(key, val, full_key, max_depth):
+            level = len(full_key.split('.')) - 2
+            if level == 0 and key == '$index':
+                return tuple(val)
+
+            if level < max_depth and isinstance(val, dict):
+                return {k: _entry(k, v, f'{full_key}.{k}', max_depth)
+                        for k, v in val.items()}
+
+            if level == max_depth:
+                return _parse_ref_entry(full_key, val)
+
+            return val
+
+        with open(filename) as fp:
+            ref_entries = yaml.safe_load(fp)
+
+        test_basename = type(self).__name__
+        try:
+            ref_yaml = ref_entries[test_basename]
+        except KeyError:
+            return {}
+
+        # Convert the yaml references to `reference`
+        mkref = {}
+
+        # Search for an index
+        if '$index' in ref_yaml:
+            index = tuple(ref_yaml['$index'])
+            mkref['$index'] = index
+            max_level = len(index)
+        else:
+            max_level = 1
+
+        for key, val in ref_yaml.items():
+            mkref[key] = _entry(key, val, f'{test_basename}.{key}', max_level)
+
+        return mkref
+
+    def _resolve_reference(self):
+        '''Determine the reference tuple for this test'''
+
+        # TODO: Move the $ref logic to a subclass for RegressionTestDict
+
+        ref_file = self.reference.pop('$ref', None)
+        if ref_file:
+            # FIXME: reference prefix must be a configuration option
+            ref_prefix = os.getenv('RFM_REFERENCE_PREFIX', self.prefix)
+            self.reference = self._load_ref_file(os.path.join(ref_prefix, ref_file))
+            self.reference.reset_index()
+
+        if self.reference.index is None:
+            return self.reference
+
+        try:
+            return {
+                f'{self.current_partition.fullname}': self.reference[self]
+            }
+        except KeyError as err:
+            getlogger().debug(f'reference look up: key `{err}` not found: '
+                              'no reference will be set')
+
     @final
     def check_performance(self):
         '''The performance checking phase of the regression test pipeline.
@@ -2415,7 +2677,6 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
             return
 
         perf_patterns = getattr(self, 'perf_patterns', None)
-
         if perf_patterns is not None and self.perf_variables:
             # We can only make this check here, because variables can be set
             # anywhere in the test before this point.
@@ -2424,13 +2685,16 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
                 "'perf_variables' in a test"
             )
 
+        # Convert to a ScopedDict
+        reference = ScopedDict(self._resolve_reference())
+
         # Convert `perf_patterns` to `perf_variables`
         if perf_patterns:
             for var, expr in self.perf_patterns.items():
                 # Retrieve the unit from the reference tuple
                 key = f'{self._current_partition.fullname}:{var}'
                 try:
-                    unit = self.reference[key][3]
+                    unit = reference[key][3]
                     if unit is None:
                         unit = ''
                 except KeyError:
@@ -2447,7 +2711,7 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
                     value = expr.evaluate() if not self.is_dry_run() else None
                     unit = expr.unit
                 except Exception as e:
-                    logging.getlogger().warning(
+                    getlogger().warning(
                         f'skipping evaluation of performance variable '
                         f'{tag!r}: {e}'
                     )
@@ -2455,7 +2719,7 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
 
                 key = f'{self._current_partition.fullname}:{tag}'
                 try:
-                    ref = self.reference[key]
+                    ref = reference[key]
                     if isinstance(ref, _XFailReference):
                         xfailures[key] = ref.message
                         ref = ref.data
@@ -2465,7 +2729,7 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
                     # the performance function.
                     if len(ref) == 4:
                         if ref[3] != unit:
-                            logging.getlogger().warning(
+                            getlogger().warning(
                                 f'reference unit ({key!r}) for the '
                                 f'performance variable {tag!r} '
                                 f'does not match the unit specified '
