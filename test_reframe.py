@@ -18,7 +18,7 @@ import pytest                           # noqa: F401, F403
 import unittests.utility as test_util   # noqa: F401, F403
 
 
-if __name__ == '__main__':
+def main():
     # Unset any ReFrame environment variable; unit tests must start in a clean
     # environment
     for var in list(os.environ.keys()):
@@ -62,3 +62,7 @@ if __name__ == '__main__':
 
     sys.argv = [sys.argv[0], *rem_args]
     sys.exit(pytest.main())
+
+
+if __name__ == '__main__':
+    main()
