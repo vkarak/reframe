@@ -30,12 +30,13 @@ jobs:
         run: |
           apt-get update && apt-get install -y curl
           curl -LsSf https://astral.sh/uv/install.sh | sh
+          source $HOME/.local/bin/env
           uv sync --group dev
 
       # Any additional examples added here will be tested
       - name: Start Flux and Run Test
         run: |
-          export PATH=$PWD/bin:$PATH
+          # export PATH=$PWD/bin:$PATH
           flux start uv run reframe -c examples/howto/flux -C examples/howto/flux/settings.py -l
           flux start uv run reframe -c examples/howto/flux -C examples/howto/flux/settings.py -r
           flux start uv run coverage run --source=reframe ./test_reframe.py --rfm-user-config=examples/howto/flux/settings.py
