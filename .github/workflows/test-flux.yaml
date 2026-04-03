@@ -30,7 +30,7 @@ jobs:
         run: |
           apt-get update && apt-get install -y curl
           curl -LsSf https://astral.sh/uv/install.sh | sh
-          source $HOME/.local/bin/env
+          . $HOME/.local/bin/env
           uv sync --group dev
 
       # Any additional examples added here will be tested
