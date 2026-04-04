@@ -37,9 +37,9 @@ jobs:
       - name: Start Flux and Run Test
         run: |
           # export PATH=$PWD/bin:$PATH
-          flux start uv run reframe -c examples/howto/flux -C examples/howto/flux/settings.py -l
-          flux start uv run reframe -c examples/howto/flux -C examples/howto/flux/settings.py -r
-          flux start uv run coverage run --source=reframe ./test_reframe.py --rfm-user-config=examples/howto/flux/settings.py
+          uv run flux start reframe -c examples/howto/flux -C examples/howto/flux/settings.py -l
+          uv run flux start reframe -c examples/howto/flux -C examples/howto/flux/settings.py -r
+          uv run flux start coverage run --source=reframe ./test_reframe.py --rfm-user-config=examples/howto/flux/settings.py
           uv run coverage xml -o coverage.xml
       - name: Upload coverage reports
         uses: codecov/codecov-action@v4.2.0

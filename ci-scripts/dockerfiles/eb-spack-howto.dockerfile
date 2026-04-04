@@ -26,7 +26,6 @@ USER rfmuser
 
 # Install Spack
 RUN git clone --branch v${_SPACK_VER} --depth 1 https://github.com/spack/spack ~/spack
-RUN pip3 install --break-system-packages easybuild==${_EB_VER}
 
 ENV PATH="/home/rfmuser/.local/bin:${PATH}"
 
@@ -36,8 +35,11 @@ COPY --chown=rfmuser . /home/rfmuser/reframe/
 WORKDIR /home/rfmuser/reframe
 
 RUN uv sync --group dev && \
-    echo '. /usr/local/lmod/lmod/init/profile && . /home/rfmuser/spack/share/spack/setup-env.sh' > /home/rfmuser/setup.sh
+    echo '. /usr/local/lmod/lmod/init/profile && . /home/rfmuser/spack/share/spack/setup-env.sh' >> /home/rfmuser/.profile
 
-ENV BASH_ENV=/home/rfmuser/setup.sh
+# Install EasyBuild
+RUN uv pip install easybuild==${_EB_VER}
+
+ENV BASH_ENV=/home/rfmuser/.profile
 
 CMD ["/bin/bash", "-c", "uv run reframe --system=tutorialsys --exec-policy=serial -r -C examples/tutorial/config/baseline_modules.py -R -c examples/tutorial/easybuild/eb_test.py -c examples/tutorial/spack/spack_test.py"]
