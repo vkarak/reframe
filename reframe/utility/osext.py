@@ -846,6 +846,24 @@ def tail(filename, num_lines=10):
         return fp.readlines()[-num_lines:]
 
 
+def read_last(filename, num_bytes=1024):
+    '''Read the last N bytes of a file
+
+    :arg filename: the filename or :class:`Path` object to read from
+    :arg num_bytes: the number of bytes to read.
+
+    .. versionadded:: 4.7
+    '''
+    if num_bytes <= 0:
+        raise ValueError('number of bytes cannot be zero or negative')
+
+    with open(filename, 'rb') as fp:
+        fp.seek(0, os.SEEK_END)
+        size = fp.tell()
+        fp.seek(max(size - num_bytes, 0), os.SEEK_SET)
+        return fp.read()
+
+
 def unique_abs_paths(paths, prune_children=True):
     '''Get the unique absolute paths from a given list of ``paths``.
 

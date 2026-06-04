@@ -172,6 +172,10 @@ class MultiFileHandler(logging.FileHandler):
         self.__lockfile_mode = lockfile_mode
         self.__locks = {}
 
+        # Always ignore the following keys in file logging
+        # NOTE: Consider setting this as the default configuration parameter
+        self.__ignore_keys |= {'check_job_script_contents'}
+
     def __generate_header(self, record):
         # Generate the header from the record and fmt
 
@@ -348,6 +352,9 @@ class CheckFieldFormatter(logging.Formatter):
         self.__expanded_fmt = {}
         self.__ignore_keys = set(ignore_keys) if ignore_keys else set()
 
+        # Always ignore the following keys in file logging
+        self.__ignore_keys |= {'check_job_script_contents'}
+
     def _expand_fmt(self, record):
         if not self.__expand_vars:
             return self.__fmt
@@ -370,7 +377,7 @@ class CheckFieldFormatter(logging.Formatter):
         for var, info in perfvars.items():
             val, ref, lower, upper, unit, result = info
             record = {
-                'check_perf_var': var.split(':')[-1],
+                'check_perf_var': var,
                 'check_perf_value': val,
                 'check_perf_unit': unit,
                 'check_perf_ref': ref,
@@ -918,6 +925,14 @@ class LoggerAdapter(logging.LoggerAdapter):
         else:
             return []
 
+    def _update_job_extras(self, job, prefix):
+        job_type = type(job)
+        for attr, alt_name in job_type.loggable_attrs():
+            extra_name  = alt_name or attr
+            key = f'{prefix}_{extra_name}'
+            self.extra['__rfm_loggable_attrs__'].append(key)
+            self.extra[key] = getattr(job, attr, None)
+
     def _update_check_extras(self):
         '''Return a dictionary with all the check-specific information.'''
 
@@ -941,11 +956,25 @@ class LoggerAdapter(logging.LoggerAdapter):
             self.extra['__rfm_loggable_attrs__'].append(key)
             self.extra[key] = val
 
+        # Add build job and job attributes
+        if self.check.build_job:
+            self._update_job_extras(self.check.build_job, 'check_build_job')
+
+        if self.check.job:
+            self._update_job_extras(self.check.job, 'check_job')
+
         # Add special extras
         self.extra['check_info'] = self.check.info()
-        self.extra['check_job_completion_time'] = _format_time_rfc3339(
-            self.extra['check_job_completion_time_unix'], r'%FT%T%:z'
-        )
+
+        # Add the legacy entries for the job completion times
+        job_completion_time_us = self.extra.get('check_job_completion_time_us')
+        if job_completion_time_us:
+            self.extra['check_job_completion_time_unix'] = (
+                job_completion_time_us / 1_000_000
+            )
+            self.extra['check_job_completion_time'] = _format_time_rfc3339(
+                self.extra['check_job_completion_time_unix'], r'%FT%T%:z'
+            )
 
     def log_result(self, level, task, msg=None, multiline=False):
         if self.check is None:

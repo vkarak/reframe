@@ -131,13 +131,11 @@ class PrettyPrinter:
             self.info(f"  * Test file: {rec['filename']}")
             self.info(f"  * Stage directory: {rec['stagedir']}")
             self.info(f"  * Node list: "
-                      f"{nodelist_abbrev(rec['job_nodelist'])}")
+                      f"{nodelist_abbrev(rec.get('job_nodelist', []))}")
             job_type = 'local' if rec['scheduler'] == 'local' else 'batch job'
-            self.info(f"  * Job type: {job_type} (id={rec['jobid']})")
-            self.info(f"  * Dependencies (conceptual): "
-                      f"{rec['dependencies_conceptual']}")
-            self.info(f"  * Dependencies (actual): "
-                      f"{rec['dependencies_actual']}")
+            self.info(
+                f"  * Job type: {job_type} (id={rec.get('job_jobid')})"
+            )
             self.info(f"  * Maintainers: {rec['maintainers']}")
             self.info(f"  * Failing phase: {rec['fail_phase']}")
             if rerun_info and not rec['fixture']:
@@ -147,12 +145,12 @@ class PrettyPrinter:
 
             msg = rec['fail_reason']
             if isinstance(rec['fail_info']['exc_value'], BuildError):
-                stdout = rec['build_stdout']
-                stderr = rec['build_stderr']
+                stdout = rec.get('build_job_stdout')
+                stderr = rec.get('build_job_stderr')
                 print_file_info = True
             elif isinstance(rec['fail_info']['exc_value'], SanityError):
-                stdout = rec['job_stdout']
-                stderr = rec['job_stderr']
+                stdout = rec.get('job_stdout')
+                stderr = rec.get('job_stderr')
                 print_file_info = True
             else:
                 print_file_info = False

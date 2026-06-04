@@ -308,7 +308,8 @@ def test_perf_logging_no_perfvars(make_runner, make_exec_ctx, perf_test,
                 '%(check_display_name)s,%(check_system)s,'
                 '%(check_partition)s,%(check_environ)s,'
                 '%(check_jobid)s,%(check_result)s,%(check_perfvalues)s'
-            )
+            ),
+            perffmt=''
         )
     )
     logging.configure_logging(rt.runtime().site_config)
@@ -411,7 +412,7 @@ def perflog_fmt(request):
 
 def test_perf_logging_all_attrs(make_runner, make_exec_ctx, perf_test,
                                 config_perflog, tmp_path, perflog_fmt):
-    make_exec_ctx(config_perflog(fmt=perflog_fmt))
+    make_exec_ctx(config_perflog(fmt=perflog_fmt, perffmt=''))
     logging.configure_logging(rt.runtime().site_config)
     runner = make_runner()
     testcases = executors.generate_testcases([perf_test])
@@ -422,9 +423,30 @@ def test_perf_logging_all_attrs(make_runner, make_exec_ctx, perf_test,
     with open(logfile) as fp:
         header = fp.readline()
 
-    loggable_attrs = type(perf_test).loggable_attrs()
+    def _loggable_keys(cls, prefix):
+        return {f'{prefix}_{alt_name or name}'
+                for name, alt_name in cls.loggable_attrs()}
+
+    # To retrieve the job attributes, we need to get the instantiated testcase.
+    perf_test_final = testcases[0].check
+    all_keys = _loggable_keys(type(perf_test_final), 'check')
+    if perf_test_final.build_job:
+        all_keys |= _loggable_keys(type(perf_test_final.build_job),
+                                   'check_build_job')
+
+    if perf_test_final.job:
+        all_keys |= _loggable_keys(type(perf_test_final.job), 'check_job')
+
+    # We need to subtract the attributes ignored by default; not all of them
+    # necessarily apply to this test (e.g. `check_build_job_*` keys are
+    # meaningless if the test has no build job), so we can't just subtract
+    # their count -- we set-subtract the ones that actually apply.
+    config_schema = rt.runtime().site_config.schema
+    ignore_keys = set(config_schema['defaults'].get(
+        'logging/handlers_perflog/filelog_ignore_keys'
+    ))
     assert (len(header.split('|')) ==
-            len(loggable_attrs) + (perflog_fmt != '%(check_#ALL)s'))
+            len(all_keys - ignore_keys) + (perflog_fmt != '%(check_#ALL)s'))
 
 
 def test_perf_logging_custom_vars(make_runner, make_exec_ctx,
