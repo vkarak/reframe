@@ -134,10 +134,6 @@ class PrettyPrinter:
                       f"{nodelist_abbrev(rec['job_nodelist'])}")
             job_type = 'local' if rec['scheduler'] == 'local' else 'batch job'
             self.info(f"  * Job type: {job_type} (id={rec['jobid']})")
-            self.info(f"  * Dependencies (conceptual): "
-                      f"{rec['dependencies_conceptual']}")
-            self.info(f"  * Dependencies (actual): "
-                      f"{rec['dependencies_actual']}")
             self.info(f"  * Maintainers: {rec['maintainers']}")
             self.info(f"  * Failing phase: {rec['fail_phase']}")
             if rerun_info and not rec['fixture']:

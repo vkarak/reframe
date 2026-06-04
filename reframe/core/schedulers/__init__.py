@@ -395,6 +395,7 @@ class Job(jsonext.JSONSerializable, metaclass=JobMeta):
         self._name = name
         self._workdir = workdir
         self._script_filename = script_filename or f'{name}.sh'
+        self._script_contents = ''
 
         basename, _ = os.path.splitext(self._script_filename)
         self._stdout = stdout or f'{basename}.out'
@@ -444,6 +445,11 @@ class Job(jsonext.JSONSerializable, metaclass=JobMeta):
     def script_filename(self):
         '''The filename of the generated job script.'''
         return self._script_filename
+
+    @property
+    def script_contents(self) -> str:
+        '''The contents of the generated job script'''
+        return self._script_contents
 
     @property
     def stdout(self):
@@ -621,6 +627,8 @@ class Job(jsonext.JSONSerializable, metaclass=JobMeta):
             builder.write(runtime.emit_loadenv_commands(*environs))
             for c in commands:
                 builder.write_body(c)
+
+            self._script_contents = builder.finalize()
 
     def guess_num_tasks(self):
         num_tasks_per_node = self.num_tasks_per_node or 1

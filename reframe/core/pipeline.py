@@ -671,7 +671,8 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
     #:
     #: .. versionchanged:: 3.11.0
     #:    Extend syntax to support features and key/value pairs.
-    valid_prog_environs = variable(typ.List[typ.Str[_VALID_ENV_SYNTAX]])
+    valid_prog_environs = variable(typ.List[typ.Str[_VALID_ENV_SYNTAX]],
+                                   loggable=False)
 
     #: List of systems or system features or system properties required by this
     #: test.
@@ -761,7 +762,8 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
     #:   .. versionchanged:: 4.10
     #:      Support for combining an explicit system partition combination with
     #:      features and extras.
-    valid_systems = variable(typ.List[typ.Str[_VALID_SYS_SYNTAX]])
+    valid_systems = variable(typ.List[typ.Str[_VALID_SYS_SYNTAX]],
+                             loggable=False)
 
     #: A detailed description of the test.
     #:
@@ -788,7 +790,7 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
     #:
     #: :type: :class:`str`
     #: :default: ``''``
-    sourcepath = variable(str, value='')
+    sourcepath = variable(str, value='', loggable=False)
 
     #: The directory containing the test's resources.
     #:
@@ -818,7 +820,8 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
     #:     .. versionchanged:: 3.0
     #:        Default value is now conditionally set to either ``'src'`` or
     #:        :class:`None`.
-    sourcesdir = variable(str, typ.Dict[str, object], type(None), value='src')
+    sourcesdir = variable(str, typ.Dict[str, object], type(None),
+                          value='src', loggable=False)
 
     #: .. versionadded:: 2.14
     #:
@@ -848,7 +851,7 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
     #:
     #: :type: :class:`List[str]`
     #: :default: ``[]``
-    prebuild_cmds = variable(typ.List[str], value=[])
+    prebuild_cmds = variable(typ.List[str], value=[], loggable=False)
 
     #: .. versionadded:: 3.0
     #:
@@ -860,7 +863,7 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
     #:
     #: :type: :class:`List[str]`
     #: :default: ``[]``
-    postbuild_cmds = variable(typ.List[str], value=[])
+    postbuild_cmds = variable(typ.List[str], value=[], loggable=False)
 
     #: The name of the executable to be launched during the run phase.
     #:
@@ -875,13 +878,13 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
     #: .. versionchanged:: 3.7.3
     #:    Default value changed from ``os.path.join('.', self.unique_name)`` to
     #:    :class:`required`.
-    executable = variable(str)
+    executable = variable(str, loggable=False)
 
     #: List of options to be passed to the :attr:`executable`.
     #:
     #: :type: :class:`List[str]`
     #: :default: ``[]``
-    executable_opts = variable(typ.List[str], value=[])
+    executable_opts = variable(typ.List[str], value=[], loggable=False)
 
     #: .. versionadded:: 2.20
     #:
@@ -933,7 +936,7 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
     #:
     #: :type: :class:`List[str]`
     #: :default: ``[]``
-    prerun_cmds = variable(typ.List[str], value=[])
+    prerun_cmds = variable(typ.List[str], value=[], loggable=False)
 
     #: .. versionadded:: 3.0
     #:
@@ -944,7 +947,7 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
     #:
     #: :type: :class:`List[str]`
     #: :default: ``[]``
-    postrun_cmds = variable(typ.List[str], value=[])
+    postrun_cmds = variable(typ.List[str], value=[], loggable=False)
 
     #: List of files to be kept after the test finishes.
     #:
@@ -964,7 +967,7 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
     #: .. versionchanged:: 3.3
     #:    This field accepts now also file glob patterns.
     #:
-    keep_files = variable(typ.List[str], value=[])
+    keep_files = variable(typ.List[str], value=[], loggable=True)
 
     #: List of files or directories (relative to the :attr:`sourcesdir`) that
     #: will be symlinked in the stage directory and not copied.
@@ -974,7 +977,7 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
     #:
     #: :type: :class:`List[str]`
     #: :default: ``[]``
-    readonly_files = variable(typ.List[str], value=[])
+    readonly_files = variable(typ.List[str], value=[], loggable=True)
 
     #: Set of tags associated with this test.
     #:
@@ -982,7 +985,7 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
     #:
     #: :type: :class:`Set[str]`
     #: :default: an empty set
-    tags = variable(typ.Set[str], value=set())
+    tags = variable(typ.Set[str], value=set(), loggable=True)
 
     #: List of people responsible for this test.
     #:
@@ -990,7 +993,7 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
     #:
     #: :type: :class:`List[str]`
     #: :default: ``[]``
-    maintainers = variable(typ.List[str], value=[])
+    maintainers = variable(typ.List[str], value=[], loggable=True)
 
     #: Mark this test as a strict performance test.
     #:
@@ -1000,7 +1003,7 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
     #:
     #: :type: boolean
     #: :default: :class:`True`
-    strict_check = variable(typ.Bool, value=True)
+    strict_check = variable(typ.Bool, value=True, loggable=True)
 
     #: Number of tasks required by this test.
     #:
@@ -1045,7 +1048,7 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
     #:        Allow :attr:`num_tasks` to be :obj:`None`.
     #:     .. versionchanged:: 4.8
     #:        ``pbs`` and ``torque`` backends interpret ``num_tasks=None``.
-    num_tasks = variable(int, type(None), value=1)
+    num_tasks = variable(int, type(None), value=1, loggable=True)
 
     #: Number of tasks per node required by this test.
     #:
@@ -1053,7 +1056,7 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
     #:
     #: :type: integral or :class:`None`
     #: :default: :class:`None`
-    num_tasks_per_node = variable(int, type(None), value=None)
+    num_tasks_per_node = variable(int, type(None), value=None, loggable=True)
 
     #: Number of GPUs per node required by this test.
     #: This attribute is translated internally to the ``_rfm_gpu`` resource.
@@ -1065,7 +1068,7 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
     #:
     #: .. versionchanged:: 4.0.0
     #:    The default value changed to :const:`None`.
-    num_gpus_per_node = variable(int, type(None), value=None)
+    num_gpus_per_node = variable(int, type(None), value=None, loggable=True)
 
     #: Number of CPUs per task required by this test.
     #:
@@ -1073,7 +1076,7 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
     #:
     #: :type: integral or :class:`None`
     #: :default: :class:`None`
-    num_cpus_per_task = variable(int, type(None), value=None)
+    num_cpus_per_task = variable(int, type(None), value=None, loggable=True)
 
     #: Number of tasks per core required by this test.
     #:
@@ -1081,7 +1084,7 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
     #:
     #: :type: integral or :class:`None`
     #: :default: :class:`None`
-    num_tasks_per_core = variable(int, type(None), value=None)
+    num_tasks_per_core = variable(int, type(None), value=None, loggable=True)
 
     #: Number of tasks per socket required by this test.
     #:
@@ -1089,7 +1092,7 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
     #:
     #: :type: integral or :class:`None`
     #: :default: :class:`None`
-    num_tasks_per_socket = variable(int, type(None), value=None)
+    num_tasks_per_socket = variable(int, type(None), value=None, loggable=True)
 
     #: Specify whether this tests needs simultaneous multithreading enabled.
     #:
@@ -1097,7 +1100,8 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
     #:
     #: :type: boolean or :class:`None`
     #: :default: :class:`None`
-    use_multithreading = variable(typ.Bool, type(None), value=None)
+    use_multithreading = variable(typ.Bool, type(None), value=None,
+                                  loggable=True)
 
     #: .. versionadded:: 3.0
     #:
@@ -1108,19 +1112,19 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
     #: :type: :class:`str` or :class:`datetime.timedelta`
     #: :default: :class:`None`
     max_pending_time = variable(type(None), typ.Duration, value=None,
-                                allow_implicit=True)
+                                allow_implicit=True, loggable=True)
 
     #: Specify whether this test needs exclusive access to nodes.
     #:
     #: :type: boolean
     #: :default: :class:`False`
-    exclusive_access = variable(typ.Bool, value=False)
+    exclusive_access = variable(typ.Bool, value=False, loggable=True)
 
     #: Always execute this test locally.
     #:
     #: :type: boolean
     #: :default: :class:`False`
-    local = variable(typ.Bool, value=False)
+    local = variable(typ.Bool, value=False, loggable=True)
 
     #: The performance reference values for this test.
     #:
@@ -1509,7 +1513,7 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
     #: :type: :class:`List[str]` or :class:`Dict[str, object]`
     #: :default: ``[]``
     modules = variable(typ.List[str], typ.List[typ.Dict[str, object]],
-                       value=[])
+                       value=[], loggable=True)
 
     #: Environment variables to be set before running this test.
     #:
@@ -1521,7 +1525,7 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
     #:
     #: .. versionadded:: 4.0.0
     env_vars = variable(typ.Dict[str, str],
-                        typ.Dict[str, object], value={})
+                        typ.Dict[str, object], value={}, loggable=True)
     # NOTE: We still keep the original type, just to allow setting this
     # variable from the command line, because otherwise, ReFrame will not know
     # how to convert a value to an arbitrary object.
@@ -1564,7 +1568,7 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
     #:       The default value is now :class:`None` and it can be set globally
     #:       per partition via the configuration.
     time_limit = variable(type(None), typ.Duration, value=None,
-                          allow_implicit=True)
+                          allow_implicit=True, loggable=True)
 
     #: .. versionadded:: 3.5.1
     #:
@@ -1575,7 +1579,7 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
     #: :type: :class:`str` or :class:`float` or :class:`int`
     #: :default: :class:`None`
     build_time_limit = variable(type(None), typ.Duration, value=None,
-                                allow_implicit=True)
+                                allow_implicit=True, loggable=True)
 
     #: .. versionadded:: 2.8
     #:
@@ -1648,7 +1652,7 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
     #:       A new more powerful syntax was introduced
     #:       that allows also custom job script directive prefixes.
     extra_resources = variable(typ.Dict[str, typ.Dict[str, object]],
-                               value={})
+                               value={}, loggable=False)
 
     #: .. versionadded:: 3.3
     #:
@@ -1671,7 +1675,7 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
     #:
     #: :type: boolean
     #: :default: :class:`True`
-    build_locally = variable(typ.Bool, value=True)
+    build_locally = variable(typ.Bool, value=True, loggable=True)
 
     #: .. versionadded:: 4.2
     #:
@@ -2220,6 +2224,11 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
 
     # Various properties useful only for logging
 
+    @loggable_as('basename')
+    @property
+    def _basename(self):
+        return type(self).__name__
+
     @loggable_as('system')
     @property
     def _system_name(self):
@@ -2237,29 +2246,51 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
         if self.current_environ:
             return self.current_environ.name
 
+    @loggable_as('sysenv')
+    @property
+    def _sysenv(self):
+        if self.current_partition and self.current_environ:
+            return (f'{self.current_system.name}:'
+                    f'{self.current_partition.name}+'
+                    f'{self.current_environ.name}')
+
     @loggable_as('jobid')
     @property
     def _jobid(self):
         if self.job:
             return self.job.jobid
 
-    @loggable_as('job_submit_time')
+    @loggable_as('job_submit_timestamp')
     @property
     def _job_submit_time(self):
         if self.job:
             return self.job.submit_time
 
-    @loggable_as('job_completion_time_unix')
+    @loggable_as('job_completion_timestamp')
     @property
     def _job_completion_time(self):
         if self.job:
             return self.job.completion_time
+
+    # FIXME: Deprecate this
+    @loggable_as('job_completion_time_unix')
+    @property
+    def _job_completion_time_unix(self):
+        return self._job_completion_time
 
     @loggable_as('job_exitcode')
     @property
     def _job_exitcode(self):
         if self.job:
             return self.job.exitcode
+
+    @loggable_as('job_nodelist_folded')
+    @property
+    def _job_nodelist_folded(self):
+        if self.job:
+            return util.fold_node_list(self.job.nodelist)
+
+        return ''
 
     @loggable_as('job_nodelist')
     @property
@@ -3110,7 +3141,7 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
 
                     ref = (0, None, None)
 
-                self._perfvalues[key] = [value, *ref, unit, None]
+                self._perfvalues[tag] = [value, *ref, unit, None]
 
         if self.is_dry_run():
             return

@@ -7,6 +7,7 @@ import decimal
 import functools
 import inspect
 import json
+from pathlib import Path
 import jsonschema
 import lxml.etree as etree
 import math
@@ -31,7 +32,7 @@ from .utility import parse_cmp_spec, parse_query_spec
 # The schema data version
 # Major version bumps are expected to break the validation of previous schemas
 
-DATA_VERSION = '4.2'
+DATA_VERSION = '5.0'
 _SCHEMA = None
 _RESERVED_SESSION_INFO_KEYS = None
 _DATETIME_FMT = r'%Y%m%dT%H%M%S%z'
@@ -280,12 +281,8 @@ class RunReport:
 
     def update_timestamps(self, ts_start, ts_end):
         self.__report['session_info'].update({
-            'time_start': time.strftime(_DATETIME_FMT,
-                                        time.localtime(ts_start)),
-            'time_start_unix': ts_start,
-            'time_end': time.strftime(_DATETIME_FMT, time.localtime(ts_end)),
-            'time_end_unix': ts_end,
-            'time_elapsed': ts_end - ts_start
+            'start_timestamp': ts_start,
+            'end_timestramp': ts_end,
         })
 
     def update_extras(self, extras):
@@ -299,7 +296,6 @@ class RunReport:
         self.__report['session_info'].update(extras)
 
     def update_run_stats(self, stats):
-        session_uuid = self.__report['session_info']['uuid']
         for runidx, tasks in stats.runs():
             testcases = []
             num_failures = 0
@@ -311,46 +307,49 @@ class RunReport:
                 # these are not set inside the check.
                 check, partition, environ = t.testcase
                 entry = {
+                    # TODO: Most of these should become loggable
+                    # RegressionTest properties; keep here only those that are
+                    # related to the test case on the test.
+                    'build_job_script': None,
                     'build_jobid': None,
-                    'build_stderr': None,
-                    'build_stdout': None,
-                    'dependencies_actual': [
-                        (d.check.unique_name,
-                         d.partition.fullname, d.environ.name)
-                        for d in t.testcase.deps
-                    ],
-                    'dependencies_conceptual': [
-                        d[0] for d in t.check.user_deps()
-                    ],
+                    'build_stderr_file': None,
+                    'build_stdout_file': None,
                     'environ': environ.name,
                     'fail_phase': None,
                     'fail_reason': None,
                     'filename': inspect.getfile(type(check)),
                     'fixture': check.is_fixture(),
-                    'job_completion_time': None,
-                    'job_completion_time_unix': None,
-                    'job_stderr': None,
-                    'job_stdout': None,
+                    'job_completion_timestamp': None,
+                    'job_script': None,
+                    'job_stderr_file': None,
+                    'job_stdout_file': None,
                     'partition': partition.name,
                     'result': t.result,
                     'run_index': runidx,
+                    'testcase_index': tidx,
                     'scheduler': partition.scheduler.registered_name,
-                    'session_uuid': session_uuid,
-                    'time_compile': t.duration('compile_complete'),
-                    'time_performance': t.duration('performance'),
-                    'time_run': t.duration('run_complete'),
-                    'time_sanity': t.duration('sanity'),
-                    'time_setup': t.duration('setup'),
-                    'time_total': t.duration('total'),
-                    'uuid': f'{session_uuid}:{runidx}:{tidx}'
                 }
+
+                if t.succeeded:
+                    test_prefix = Path(check.outputdir)
+                else:
+                    test_prefix = Path(check.stagedir)
+
                 if check.job:
-                    entry['job_stderr'] = check.stderr.evaluate()
-                    entry['job_stdout'] = check.stdout.evaluate()
+                    with open(test_prefix / check.job.script_filename) as fp:
+                        entry['job_script'] = fp.read()
+
+                    entry['job_stderr_file'] = check.stderr.evaluate()
+                    entry['job_stdout_file'] = check.stdout.evaluate()
 
                 if check.build_job:
-                    entry['build_stderr'] = check.build_stderr.evaluate()
-                    entry['build_stdout'] = check.build_stdout.evaluate()
+                    with open(
+                        test_prefix / check.build_job.script_filename
+                    ) as fp:
+                        entry['build_job_script'] = fp.read()
+
+                    entry['build_stderr_file'] = check.build_stderr.evaluate()
+                    entry['build_stdout_file'] = check.build_stdout.evaluate()
 
                 if t.failed:
                     num_failures += 1
@@ -375,7 +374,7 @@ class RunReport:
                 # Add any loggable variables and parameters
                 test_cls = type(check)
                 for name, alt_name in test_cls.loggable_attrs():
-                    if alt_name == 'partition' or alt_name == 'environ':
+                    if alt_name in {'partition', 'environ'}:
                         # We set those from the testcase
                         continue
 
