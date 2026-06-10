@@ -282,7 +282,7 @@ class RunReport:
     def update_timestamps(self, ts_start, ts_end):
         self.__report['session_info'].update({
             'start_timestamp': ts_start,
-            'end_timestramp': ts_end,
+            'end_timestamp': ts_end,
         })
 
     def update_extras(self, extras):
@@ -310,46 +310,15 @@ class RunReport:
                     # TODO: Most of these should become loggable
                     # RegressionTest properties; keep here only those that are
                     # related to the test case on the test.
-                    'build_job_script': None,
-                    'build_jobid': None,
-                    'build_stderr_file': None,
-                    'build_stdout_file': None,
                     'environ': environ.name,
                     'fail_phase': None,
                     'fail_reason': None,
-                    'filename': inspect.getfile(type(check)),
-                    'fixture': check.is_fixture(),
-                    'job_completion_timestamp': None,
-                    'job_script': None,
-                    'job_stderr_file': None,
-                    'job_stdout_file': None,
                     'partition': partition.name,
                     'result': t.result,
                     'run_index': runidx,
                     'testcase_index': tidx,
                     'scheduler': partition.scheduler.registered_name,
                 }
-
-                if t.succeeded:
-                    test_prefix = Path(check.outputdir)
-                else:
-                    test_prefix = Path(check.stagedir)
-
-                if check.job:
-                    with open(test_prefix / check.job.script_filename) as fp:
-                        entry['job_script'] = fp.read()
-
-                    entry['job_stderr_file'] = check.stderr.evaluate()
-                    entry['job_stdout_file'] = check.stdout.evaluate()
-
-                if check.build_job:
-                    with open(
-                        test_prefix / check.build_job.script_filename
-                    ) as fp:
-                        entry['build_job_script'] = fp.read()
-
-                    entry['build_stderr_file'] = check.build_stderr.evaluate()
-                    entry['build_stdout_file'] = check.build_stdout.evaluate()
 
                 if t.failed:
                     num_failures += 1

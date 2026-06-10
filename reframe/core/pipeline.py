@@ -40,7 +40,9 @@ import reframe.utility.sanity as sn
 import reframe.utility.typecheck as typ
 import reframe.utility.udeps as udeps
 from reframe.core.backends import getlauncher, getscheduler
-from reframe.core.builtins import _XFailReference, xfail
+from reframe.core.builtins import (deferrable, deprecate,
+                                   loggable, loggable_as, final,
+                                   variable, _XFailReference, xfail)
 from reframe.core.buildsystems import BuildSystemField
 from reframe.core.containers import ContainerPlatform
 from reframe.core.fields import remove_convertible
@@ -55,7 +57,7 @@ from reframe.core.exceptions import (BuildError, DependencyError,
                                      ReferenceParseError,
                                      ReframeError)
 from reframe.core.hooks import attach_hooks
-from reframe.core.logging import getlogger
+from reframe.core.logging import getlogger, _format_time_rfc3339
 from reframe.core.meta import RegressionTestMeta
 from reframe.core.schedulers import Job
 from reframe.core.warnings import user_deprecation_warning
@@ -1821,6 +1823,10 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
         if isinstance(self.reference, _ReferenceDict):
             self.reference.resolve_external_references(self)
 
+        # Default format for loggable timestamps in the test report
+        # Logging handlers will override this formatting
+        self._rfm_datefmt = r'%FT%T:z'
+
     @classmethod
     def _process_hook_registry(cls):
         '''Process and validate the pipeline hooks.'''
@@ -2229,23 +2235,6 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
     def _basename(self):
         return type(self).__name__
 
-    @loggable_as('system')
-    @property
-    def _system_name(self):
-        return self.current_system.name
-
-    @loggable_as('partition')
-    @property
-    def _partition_name(self):
-        if self.current_partition:
-            return self.current_partition.name
-
-    @loggable_as('environ')
-    @property
-    def _environ_name(self):
-        if self.current_environ:
-            return self.current_environ.name
-
     @loggable_as('sysenv')
     @property
     def _sysenv(self):
@@ -2254,35 +2243,118 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
                     f'{self.current_partition.name}+'
                     f'{self.current_environ.name}')
 
+    @loggable_as('filename')
+    @property
+    def _filename(self):
+        return inspect.getfile(type(self))
+
+    @loggable_as('fixture')
+    @property
+    def _fixture(self):
+        return self.is_fixture()
+
+    @loggable_as('build_jobid')
+    @property
+    def _build_jobid(self):
+        if self.build_job:
+            return self.build_job.jobid
+
+    @loggable_as('build_job_completion_timestamp')
+    @property
+    def _build_job_completion_timestamp(self):
+        if self.build_job:
+            return self.build_job.completion_time
+
+    @loggable_as('build_job_script')
+    @property
+    def _build_job_script(self):
+        if self.build_job:
+            return self.build_job.script_contents
+
+    @loggable_as('build_job_stderr_file')
+    @property
+    def _build_job_stderr_file(self):
+        if self.build_job:
+            return self.build_stderr.evaluate()
+
+    @loggable_as('build_job_stdout_file')
+    @property
+    def _build_job_stdout_file(self):
+        if self.build_job:
+            return self.build_stdout.evaluate()
+
     @loggable_as('jobid')
     @property
     def _jobid(self):
         if self.job:
             return self.job.jobid
 
+    @loggable_as('job_script')
+    @property
+    def job_script(self):
+        if self.job:
+            return self.job.script_contents
+
+    @loggable_as('job_stderr_file')
+    @property
+    def _job_stderr_file(self):
+        if self.job:
+            return self.job_stderr.evaluate()
+
+    @loggable_as('job_stdout_file')
+    @property
+    def _job_stdout_file(self):
+        if self.job:
+            return self.job_stdout.evaluate()
+
     @loggable_as('job_submit_timestamp')
     @property
-    def _job_submit_time(self):
+    def _job_submit_timestamp(self):
         if self.job:
             return self.job.submit_time
 
+    @loggable_as('job_submit_time')
+    @property
+    def _job_submit_time(self):
+        if self.job:
+            return _format_time_rfc3339(self.job.submit_time,
+                                        self._rfm_datefmt)
+
+    @loggable_as('job_start_timestamp')
+    @property
+    def _job_start_timestamp(self):
+        if self.job:
+            return self.job.start_time
+
+    @loggable_as('job_start_time')
+    @property
+    def _job_start_time(self):
+        if self.job:
+            return _format_time_rfc3339(self.job.start_time, self._rfm_datefmt)
+
     @loggable_as('job_completion_timestamp')
     @property
-    def _job_completion_time(self):
+    def _job_completion_timestamp(self):
         if self.job:
             return self.job.completion_time
 
-    # FIXME: Deprecate this
-    @loggable_as('job_completion_time_unix')
+    @loggable_as('job_completion_time')
     @property
-    def _job_completion_time_unix(self):
-        return self._job_completion_time
+    def _job_completion_time(self):
+        if self.job:
+            return _format_time_rfc3339(self.job.completion_time,
+                                        self._rfm_datefmt)
 
     @loggable_as('job_exitcode')
     @property
     def _job_exitcode(self):
         if self.job:
             return self.job.exitcode
+
+    @loggable_as('job_nodelist')
+    @property
+    def _job_nodelist(self):
+        return self.job.nodelist if self.job else []
 
     @loggable_as('job_nodelist_folded')
     @property
@@ -2291,11 +2363,6 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
             return util.fold_node_list(self.job.nodelist)
 
         return ''
-
-    @loggable_as('job_nodelist')
-    @property
-    def _job_nodelist(self):
-        return self.job.nodelist if self.job else []
 
     def info(self):
         '''Provide live information for this test.
