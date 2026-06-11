@@ -340,7 +340,7 @@ class RunReport:
                 elif t.succeeded:
                     entry['outputdir'] = check.outputdir
 
-                # Add any loggable variables and parameters
+                # Add any loggable test variables and parameters
                 test_cls = type(check)
                 for name, alt_name in test_cls.loggable_attrs():
                     if alt_name in {'partition', 'environ'}:
@@ -360,11 +360,18 @@ class RunReport:
                     except AttributeError:
                         entry[key] = '<undefined>'
 
-                if entry['job_completion_time_unix']:
-                    entry['job_completion_time'] = _format_time_rfc3339(
-                        entry['job_completion_time_unix'],
-                        '%FT%T%:z'
-                    )
+                # Add any loggable job variables
+                if check.job:
+                    job_type = type(check.job)
+                    for name, alt_name in job_type.loggable_attrs():
+                        key = alt_name if alt_name else name
+                        entry[f'job_{key}'] = getattr(check.job, name)
+
+                # if entry['job_completion_time_unix']:
+                #     entry['job_completion_time'] = _format_time_rfc3339(
+                #         entry['job_completion_time_unix'],
+                #         '%FT%T%:z'
+                #     )
 
                 testcases.append(entry)
 
