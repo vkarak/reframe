@@ -416,6 +416,7 @@ class Job(jsonext.JSONSerializable, metaclass=JobMeta):
         self._state = None
         self._nodelist = []
         self._submit_time = None
+        self._start_time = None
         self._completion_time = None
 
         # Job errors discovered while polling; if not None this will be raised
@@ -635,7 +636,21 @@ class Job(jsonext.JSONSerializable, metaclass=JobMeta):
     @loggable
     @property
     def submit_timestamp(self):
-        return self.format_timestamp(self.submit_time)
+        return self.format_timestamp(self._submit_time)
+
+    @property
+    def start_time(self):
+        return self._start_time
+
+    @loggable
+    @property
+    def start_time_us(self):
+        return int(self._start_time * 1_000_000)
+
+    @loggable
+    @property
+    def start_timestamp(self):
+        return self.format_timestamp(self._start_time)
 
     def prepare(self, commands, environs=None, prepare_cmds=None,
                 strict_flex=False, **gen_opts):
