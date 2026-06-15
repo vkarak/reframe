@@ -361,17 +361,29 @@ class RunReport:
                         entry[key] = '<undefined>'
 
                 # Add any loggable job variables
+                if check.build_job:
+                    job_type = type(check.build_job)
+                    for name, alt_name in job_type.loggable_attrs():
+                        key = alt_name if alt_name else name
+                        entry[f'build_job_{key}'] = getattr(check.build_job,
+                                                            name)
+
                 if check.job:
                     job_type = type(check.job)
                     for name, alt_name in job_type.loggable_attrs():
                         key = alt_name if alt_name else name
                         entry[f'job_{key}'] = getattr(check.job, name)
 
-                # if entry['job_completion_time_unix']:
-                #     entry['job_completion_time'] = _format_time_rfc3339(
-                #         entry['job_completion_time_unix'],
-                #         '%FT%T%:z'
-                #     )
+                    # Add the legacy entries
+                    if entry['job_completion_time_us'] is not None:
+                        entry['job_completion_time_unix'] = (
+                            entry['job_completion_time_us'] / 1_000_000
+                        )
+                        entry['job_completion_time'] = _format_time_rfc3339(
+                            entry['job_completion_time_unix'], r'%FT%T%:z'
+                        )
+                    else:
+                        entry['job_completion_time_unix'] = None
 
                 testcases.append(entry)
 
