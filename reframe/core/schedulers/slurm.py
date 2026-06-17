@@ -478,7 +478,7 @@ class SlurmJobScheduler(sched.JobScheduler):
         :arg reduce_fn: A callable taking the list of converted timestamp
             values in seconds and returning a single float value
         '''
-        if job._completion_time is not None:
+        if getattr(job, timestamp_attr) is not None:
             return
 
         # Convert timestamps to floats
@@ -506,7 +506,7 @@ class SlurmJobScheduler(sched.JobScheduler):
             )
             try:
                 completed = _run_strict(
-                    f'{self._sacct} -X -S {t_start} -P '
+                    f'{self._sacct} --noheader -X -S {t_start} -P '
                     f'-j {",".join(job.jobid for job in jobs)} '
                     f'-o jobid,state,exitcode,start,end,nodelist'
                 )
@@ -564,10 +564,10 @@ class SlurmJobScheduler(sched.JobScheduler):
             job._nodespec = ','.join(m.group('nodespec') for m in jobarr_info)
             self._update_timestamp(
                 job, '_completion_time',
-                (m.group('end') for m in jobarr_info), max
+                [m.group('end') for m in jobarr_info], max
             )
             self._update_timestamp(
-                job, '_start_time', (m.group('end') for m in jobarr_info), max
+                job, '_start_time', [m.group('start') for m in jobarr_info], min
             )
 
         # Cancel jobs that blocked or pending for too long
@@ -620,6 +620,11 @@ class SlurmJobScheduler(sched.JobScheduler):
         for job, reason_descr in pending_reasons.items():
             # The reason description may have two parts as follows:
             # "ReqNodeNotAvail, UnavailableNodes:nid00[408,411-415]"
+
+            # FIXME: This is crashing for the squeue backend with:
+            #    reason = reason_descr.split(',', maxsplit=1)[0].strip()
+            #             ^^^^^^^^^^^^^^^^^^
+            # AttributeError: 'list' object has no attribute 'split'
             reason = reason_descr.split(',', maxsplit=1)[0].strip()
             if reason not in self._cancel_reasons:
                 continue

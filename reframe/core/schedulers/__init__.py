@@ -509,8 +509,9 @@ class Job(jsonext.JSONSerializable, metaclass=JobMeta):
 
     @loggable
     @property
-    def completion_time_us(self):
-        return int(self._completion_time * 1_000_000)
+    def completion_time_us(self) -> int | None:
+        if self._completion_time is not None:
+            return int(self._completion_time * 1_000_000)
 
     @loggable
     @property
@@ -630,8 +631,9 @@ class Job(jsonext.JSONSerializable, metaclass=JobMeta):
 
     @loggable
     @property
-    def submit_time_us(self):
-        return int(self._submit_time * 1_000_000)
+    def submit_time_us(self) -> int | None:
+        if self._submit_time is not None:
+            return int(self._submit_time * 1_000_000)
 
     @loggable
     @property
@@ -644,8 +646,9 @@ class Job(jsonext.JSONSerializable, metaclass=JobMeta):
 
     @loggable
     @property
-    def start_time_us(self):
-        return int(self._start_time * 1_000_000)
+    def start_time_us(self) -> int | None:
+        if self._start_time is not None:
+            return int(self._start_time * 1_000_000)
 
     @loggable
     @property
