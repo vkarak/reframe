@@ -196,7 +196,7 @@ You can get in contact with the ReFrame community in the following ways:
 
 ### Slack
 
-Please join the community's [Slack channel](https://join.slack.com/t/reframetalk/shared_invite/zt-3706f0tj6-2CjHh07HdQNbmLw1qAasjg) for keeping up with the latest news about ReFrame, posting questions and, generally getting in touch with other users and the developers.
+Please join the community's [Slack channel](https://join.slack.com/t/reframetalk/shared_invite/zt-42qh7covn-fdU~Oa7OHoO2VB0B9NeyBA) for keeping up with the latest news about ReFrame, posting questions and, generally getting in touch with other users and the developers.
 
 > NOTE: Slack invite links expire for security reasons. Although we update them regularly, if you encounter problems joining the community Slack channel, please open an issue.
 
