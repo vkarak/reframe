@@ -3180,6 +3180,7 @@ class RegressionTest(RegressionTestPlugin, jsonext.JSONSerializable):
         # Check the performance variables against their references.
         errors = _PerfErrorBuilder()
         for key, values in self._perfvalues.items():
+            tag = key.split(':')[-1]
             val, ref, low_thres, high_thres, unit, _ = values
 
             # Verify that val is a number

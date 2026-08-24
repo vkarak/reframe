@@ -2348,7 +2348,17 @@ def test_perf_expected_failures(perftest, sanity_file, perf_file,
     if exctype is None:
         _run_sanity(perftest, *local_exec_ctx)
     else:
-        with pytest.raises(exctype):
+        def _validate_exc(err):
+            if value2_status == 'pass':
+                print(err)
+                return 'value2' not in err.args[0]
+            if value1_status == 'pass':
+                print(err)
+                return 'value1' not in err.args[0]
+
+            return True
+
+        with pytest.raises(exctype, check=_validate_exc):
             _run_sanity(perftest, *local_exec_ctx)
 
 
