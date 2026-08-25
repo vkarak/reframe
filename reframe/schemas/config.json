@@ -87,7 +87,8 @@
                             "items": {"type": "string"}
                         },
                         "locking_enable": {"type": "boolean"},
-                        "locking_file_mode": {"type": ["string", "null"]}
+                        "locking_file_mode": {"type": ["string", "null"]},
+                        "locking_timeout": {"type": ["number", "null"]}
                     },
                     "required": ["prefix"]
                 }
@@ -585,6 +586,7 @@
                     "sqlite_conn_timeout": {"type": "number"},
                     "sqlite_db_file": {"type": "string"},
                     "sqlite_db_file_mode": {"type": "string"},
+                    "sqlite_db_lock_timeout": {"type": ["number", "null"]},
                     "target_systems": {"$ref": "#/defs/system_ref"}
                 }
             }
@@ -670,6 +672,7 @@
         "logging/handlers_perflog/filelog_ignore_keys": [],
         "logging/handlers_perflog/filelog_locking_enable": false,
         "logging/handlers_perflog/filelog_locking_file_mode": null,
+        "logging/handlers_perflog/filelog_locking_timeout": 3600,
         "logging/handlers_perflog/graylog_extras": {},
         "logging/handlers_perflog/httpjson_extras": {},
         "logging/handlers_perflog/httpjson_ignore_keys": [],
@@ -686,6 +689,7 @@
         "storage/sqlite_conn_timeout": 60,
         "storage/sqlite_db_file": "${HOME}/.reframe/reports/results.db",
         "storage/sqlite_db_file_mode": "644",
+        "storage/sqlite_db_lock_timeout": 3600,
         "storage/target_systems": ["*"],
         "systems/descr": "",
         "systems/max_local_jobs": 8,

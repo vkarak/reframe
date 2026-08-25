@@ -91,7 +91,8 @@ class _SqliteStorage(StorageBackend):
 
         self.__db_lock = osext.ReadWriteFileLock(
             os.path.join(os.path.dirname(self.__db_file), '.db.lock'),
-            self.__db_file_mode
+            self.__db_file_mode,
+            timeout=runtime().get_option('storage/0/sqlite_db_lock_timeout')
         )
 
     def _db_file(self):

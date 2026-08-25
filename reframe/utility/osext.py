@@ -8,6 +8,7 @@
 #
 
 import collections.abc
+import contextlib
 import errno
 import functools
 import fasteners
@@ -887,9 +888,39 @@ class temp_umask:
 
 
 class ReadWriteFileLock(fasteners.InterProcessReaderWriterLock):
-    def __init__(self, path, mode=None):
+    def __init__(self, path, mode=None, timeout=None):
         super().__init__(path)
+
+        # NOTE: `self.path` is set by the parent class to the filesystem
+        # encoded version of `path`, so we keep the original here for
+        # reporting purposes
+        self._path = path
         self._mode = mode
+        self._timeout = timeout
+
+    @contextlib.contextmanager
+    def read_lock(self, timeout=None, **kwargs):
+        timeout = self._timeout if timeout is None else timeout
+        if not self.acquire_read_lock(timeout=timeout, **kwargs):
+            raise ReframeError(f'could not acquire read lock on '
+                               f'{self._path!r} after {timeout}s')
+
+        try:
+            yield
+        finally:
+            self.release_read_lock()
+
+    @contextlib.contextmanager
+    def write_lock(self, timeout=None, **kwargs):
+        timeout = self._timeout if timeout is None else timeout
+        if not self.acquire_write_lock(timeout=timeout, **kwargs):
+            raise ReframeError(f'could not acquire write lock on '
+                               f'{self._path!r} after {timeout}s')
+
+        try:
+            yield
+        finally:
+            self.release_write_lock()
 
     def _do_open(self, *args, **kwargs):
         if self._mode is not None:

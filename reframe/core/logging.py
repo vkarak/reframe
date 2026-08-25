@@ -153,7 +153,7 @@ class MultiFileHandler(logging.FileHandler):
 
     def __init__(self, prefix, mode='a', encoding=None, fmt=None,
                  perffmt=None, ignore_keys=None, use_locking=False,
-                 lockfile_mode=None):
+                 lockfile_mode=None, lock_timeout=None):
         super().__init__(prefix, mode, encoding, delay=True)
 
         # Reset FileHandler's filename
@@ -170,6 +170,7 @@ class MultiFileHandler(logging.FileHandler):
         self.__ignore_keys = set(ignore_keys) if ignore_keys else set()
         self.__use_locking = use_locking
         self.__lockfile_mode = lockfile_mode
+        self.__lock_timeout = lock_timeout
         self.__locks = {}
 
     def __generate_header(self, record):
@@ -253,7 +254,8 @@ class MultiFileHandler(logging.FileHandler):
                 # When using locking, we need to  open, append and write to
                 # the file at once
                 rwlock = osext.ReadWriteFileLock(self.__lock_file_name(),
-                                                 self.__lockfile_mode)
+                                                 self.__lockfile_mode,
+                                                 self.__lock_timeout)
                 with rwlock.write_lock():
                     with open(self.baseFilename, mode=self.mode,
                               encoding=self.encoding) as fp:
@@ -496,6 +498,7 @@ def _create_filelog_handler(site_config, config_prefix):
     format_perf = site_config.get(f'{config_prefix}/format_perfvars')
     ignore_keys = site_config.get(f'{config_prefix}/ignore_keys')
     use_locking = site_config.get(f'{config_prefix}/locking_enable')
+    lock_timeout = site_config.get(f'{config_prefix}/locking_timeout')
     lockfile_mode = site_config.get(f'{config_prefix}/locking_file_mode')
     if lockfile_mode is not None:
         lockfile_mode = int(lockfile_mode, base=8)
@@ -504,7 +507,8 @@ def _create_filelog_handler(site_config, config_prefix):
                             fmt=format, perffmt=format_perf,
                             ignore_keys=ignore_keys,
                             use_locking=use_locking,
-                            lockfile_mode=lockfile_mode)
+                            lockfile_mode=lockfile_mode,
+                            lock_timeout=lock_timeout)
 
 
 @register_log_handler('syslog')

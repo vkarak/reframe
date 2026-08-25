@@ -2498,6 +2498,21 @@ Whenever an environment variable is associated with a configuration option, its 
    .. versionadded:: 4.7
 
 
+.. envvar:: RFM_SQLITE_DB_LOCK_TIMEOUT
+
+   Timeout for acquiring the lock of the results database file.
+
+   .. table::
+      :align: left
+
+      ================================== ==================
+      Associated command line option     N/A
+      Associated configuration parameter :attr:`~config.storage.sqlite_db_lock_timeout`
+      ================================== ==================
+
+   .. versionadded:: 4.11
+
+
 .. envvar:: RFM_SYSLOG_ADDRESS
 
    The address of the Syslog server to send performance logs.

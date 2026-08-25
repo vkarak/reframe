@@ -1582,6 +1582,20 @@ The additional properties for the ``filelog`` handler are the following:
 
    .. versionadded:: 4.8.3
 
+.. py:attribute:: logging.handlers_perflog..filelog..locking_timeout
+
+   :required: No
+   :default: ``3600``
+
+   Maximum time in seconds to wait for acquiring the lock of the perflog file, in case file locking is enabled.
+
+   If the lock cannot be acquired within this time, an error will be raised.
+   Set this to :obj:`None` in order to wait indefinitely.
+
+   See also :attr:`~config.logging.handlers_perflog..filelog..locking_enable`.
+
+   .. versionadded:: 4.11
+
 
 .. versionchanged:: 4.0.0
 
@@ -1947,6 +1961,21 @@ Result storage configuration
 
    The mode will only taken into account upon creation of the DB file.
    Permissions of an existing DB file have to be changed manually.
+
+.. py:attribute:: storage.sqlite_db_lock_timeout
+
+   :required: No
+   :default: ``3600``
+
+   Maximum time in seconds to wait for acquiring the lock of the results database file.
+
+   ReFrame locks the results database before accessing it, so that concurrent ReFrame processes do not corrupt it.
+   If the lock cannot be acquired within this time, an error will be raised.
+   Set this to :obj:`None` in order to wait indefinitely.
+
+   Note that this timeout is independent of :attr:`~config.storage.sqlite_conn_timeout`, which controls how long SQLite itself will wait for a locked database.
+
+   .. versionadded:: 4.11
 
 
 .. py:attribute:: storage.target_systems

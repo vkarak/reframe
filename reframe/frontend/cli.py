@@ -936,6 +936,13 @@ def main():
         type=functools.partial(int, base=8)
     )
     argparser.add_argument(
+        dest='sqlite_db_lock_timeout',
+        envvar='RFM_SQLITE_DB_LOCK_TIMEOUT',
+        configvar='storage/sqlite_db_lock_timeout',
+        type=float,
+        help='Timeout for acquiring the DB file lock (SQLite backend)'
+    )
+    argparser.add_argument(
         dest='syslog_address',
         envvar='RFM_SYSLOG_ADDRESS',
         configvar='logging/handlers_perflog/syslog_address',
