@@ -171,7 +171,7 @@ class _SqliteStorage(StorageBackend):
     def _db_create_indexes(self):
         clsname = type(self).__name__
         getlogger().debug(f'{clsname}: creating database indexes if needed')
-        with self._db_connect(self.__db_file) as conn:
+        with self._db_write(self.__db_file) as conn:
             conn.execute('CREATE INDEX IF NOT EXISTS index_testcases_time '
                          'on testcases(job_completion_time_unix)')
             conn.execute('CREATE TABLE IF NOT EXISTS metadata('
