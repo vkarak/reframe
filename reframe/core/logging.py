@@ -716,7 +716,8 @@ class HTTPJSONHandler(logging.Handler):
                 "it must be 'json_formatter(record, extras, ignore_keys)'"
             )
 
-        if not is_trivially_callable(authorization_header):
+        if (authorization_header is not None and
+            not is_trivially_callable(authorization_header)):
             raise ConfigError(
                 "httpjson: 'authorization_header' has the wrong signature: "
                 "it must be 'authorization_header()'"
