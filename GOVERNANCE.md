@@ -37,7 +37,7 @@ Maintainers review and merge pull requests, triage issues, keep the CI and the r
 The current list is in [MAINTAINERS.md](MAINTAINERS.md).
 
 Any maintainer can propose a contributor as a new maintainer.
-The leadership team decides.
+The leadership team decides on an absolute majority basis.
 We look for a track record of good contributions, a good understanding of the code base and constructive participation in reviews and discussions.
 
 Maintainers can step down at any time.
