@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
+import ast
 import contextlib
 import copy
 import fnmatch
@@ -71,6 +72,21 @@ def _normalize_syntax(conv):
         return _get
 
     return _do_normalize
+
+
+class PythonConfigValidator(ast.NodeVisitor):
+    def __init__(self):
+        self._has_site_config = False
+
+    @property
+    def valid(self):
+        return self._has_site_config
+
+    def visit_Assign(self, node):
+        for target in node.targets:
+            if (isinstance(target, ast.Name) and
+                target.id == 'site_configuration'):
+                self._has_site_config = True
 
 
 class _SiteConfig:
@@ -341,7 +357,19 @@ class _SiteConfig:
     def subconfig_system(self):
         return self._local_system
 
+    def _validate_config_python(self, filename):
+        with open(filename) as fp:
+            source_tree = ast.parse(fp.read(), filename=filename)
+
+        validator = PythonConfigValidator()
+        validator.visit(source_tree)
+        if not validator.valid:
+            raise ConfigError(
+                f"'{filename}' is not a valid Python configuration file"
+            )
+
     def load_config_python(self, filename):
+        self._validate_config_python(filename)
         try:
             mod = util.import_module_from_file(filename, load_parents=True)
         except ImportError as e:
