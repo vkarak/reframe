@@ -41,7 +41,8 @@ The leadership team decides on an absolute majority basis.
 We look for a track record of good contributions, a good understanding of the code base and constructive participation in reviews and discussions.
 
 Maintainers can step down at any time.
-A maintainer who has been inactive for more than a year may be removed by the leadership team. Before a vote, the maintainer is notified and given an opportunity to respond. The leadership team decides by majority vote.
+Maintainers can also be removed by the leadership team with an absolute majority vote.
+The maintainer to be removed is notified about the reasons and given the opportunity to respond.
 
 ## How decisions are made
 
