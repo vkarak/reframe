@@ -51,7 +51,7 @@ Bigger changes (new major features, architectural changes, changes to the public
 We decide by consensus.
 If we cannot agree, the leadership team votes and a simple majority wins.
 
-Changes to this document, to the license, or removing a maintainer need a 2/3 vote of the leadership team.
+Changes to this document needs a 2/3 vote of the leadership team.
 
 ## Releases
 
