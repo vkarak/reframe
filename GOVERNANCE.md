@@ -28,7 +28,7 @@ Current members (alphabetically):
 Members are added by an absolute majority vote of the leadership team and removed by a 2/3 absolute majority.
 The member to be removed is notified about the reasons and given the opportunity to respond.
 
-A "majority" means more than half of the current leadership team members, regardless of how many participate in the vote. A 2/3 vote is calculated the same way — two thirds of the current team, not just those who vote.
+An "absolute majority" means more than half of the current leadership team members, regardless of how many participate in the vote.
 
 
 ### Maintainers
