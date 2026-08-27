@@ -30,7 +30,6 @@ The member to be removed is notified about the reasons and given the opportunity
 
 An "absolute majority" means more than half of the current leadership team members, regardless of how many participate in the vote.
 
-
 ### Maintainers
 
 Maintainers review and merge pull requests, triage issues, keep the CI and the release tooling working and take part in the development meetings.
