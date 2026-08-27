@@ -144,6 +144,10 @@ Here is a list of the available extras during installation:
 > pip uninstall -y polars
 > ```
 
+> [!WARNING]
+> `uv` versions older than 0.11.33 have a [bug](https://github.com/astral-sh/uv/pull/20671) that mishandles marker-based default dependencies like `polars`, so a plain `uv tool install reframe-hpc` or `uv pip install reframe-hpc` (no extras at all) would silently skip `polars`, disabling the results storage feature without warning.
+> Make sure you are on `uv` 0.11.33 or later (`uv self update`).
+
 ## Running from source
 
 If you want to run the latest ReFrame directly from the repo, you can simply clone the repo and `uv run` ReFrame:
