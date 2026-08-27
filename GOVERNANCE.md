@@ -30,6 +30,8 @@ The member to be removed is notified about the reasons and given the opportunity
 
 An "absolute majority" means more than half of the current leadership team members, regardless of how many participate in the vote.
 
+Formal votes take place during the regular development meetings, with the voting agenda announced at least 14 days in advance; a member unable to attend may submit their vote in writing beforehand.
+
 ### Maintainers
 
 Maintainers review and merge pull requests, triage issues, keep the CI and the release tooling working and take part in the development meetings.
