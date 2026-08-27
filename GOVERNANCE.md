@@ -47,7 +47,7 @@ A maintainer who has been inactive for more than a year may be removed by the le
 Most decisions happen in pull requests.
 A pull request needs the approval of at least one maintainer other than the author, passing CI and documentation for any user-facing change.
 
-Bigger changes (new major features, architectural changes, changes to the public API or the configuration syntax, deprecations, release planning) are discussed in a GitHub issue first, in the development meetings or on Slack.
+Bigger changes (such as new major features, architectural changes, changes to the public API or the configuration syntax, deprecations, release planning) are discussed in a GitHub issue first, in the development meetings or on Slack.
 We decide by consensus.
 If we cannot agree, the leadership team votes and a simple majority wins.
 
