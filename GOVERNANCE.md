@@ -29,8 +29,6 @@ Members are added by a majority vote of the leadership team and removed by a 2/3
 
 A "majority" means more than half of the current leadership team members, regardless of how many participate in the vote. A 2/3 vote is calculated the same way — two thirds of the current team, not just those who vote.
 
-A member who has been inactive for more than 6 months may be removed by a 2/3 vote. Before the vote, the member is notified and given an opportunity to respond.
-A member who has been inactive for more than 6 months can be removed by vote.
 
 ### Maintainers
 
