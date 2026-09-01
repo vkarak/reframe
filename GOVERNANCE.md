@@ -68,7 +68,7 @@ What goes into the next release is tracked in the [GitHub milestones](https://gi
 
 ## Meetings and communication
 
-- The maintainers meet every three weeks to go through open issues and pull requests and discuss the next release.
+- The maintainers meet regularly to go through open issues and pull requests and discuss the next release.
 - [GitHub issues](https://github.com/reframe-hpc/reframe/issues) and pull requests are where technical discussions and decisions should be recorded.
 - [Slack](README.md#contact) is for user support, announcements and informal discussion.
 - Documentation is at https://reframe-hpc.readthedocs.io.
