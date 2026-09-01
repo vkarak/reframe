@@ -30,7 +30,7 @@ The member to be removed is notified about the reasons and given the opportunity
 
 An "absolute majority" means more than half of the current leadership team members, regardless of how many participate in the vote.
 
-Formal votes take place during the regular development meetings, with the voting agenda announced at least 14 days in advance; a member unable to attend may submit their vote in writing beforehand.
+Formal votes related to membership take place during the regular development meetings, with the voting agenda announced at least 14 days in advance; a member unable to attend may submit their vote in writing beforehand. Voting agenda and results are announced in the development meeting minutes.
 
 ### Maintainers
 
