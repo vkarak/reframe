@@ -73,10 +73,6 @@ What goes into the next release is tracked in the [GitHub milestones](https://gi
 - [Slack](README.md#contact) is for user support, announcements and informal discussion.
 - Documentation is at https://reframe-hpc.readthedocs.io.
 
-## Security
-
-Dependencies are kept up to date with Dependabot.
-
 ## Code of Conduct
 
 Everyone taking part in the project is expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
