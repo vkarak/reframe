@@ -9,5 +9,4 @@ You can contact them for any project-related matter, including [reporting a code
 | Vasileios Karakasis | [vkarak](https://github.com/vkarak) | `@Vasileios Karakasis` |
 | Eirini Koutsaniti | [ekouts](https://github.com/ekouts) | `@Eirini` |
 | Theofilos Manitaras | [teojgo](https://github.com/teojgo) | `@teo` |
-| Jack Morrison | [jack-morrison](https://github.com/jack-morrison) | `@Jack Morrison` |
 | Guilherme Peretti-Pezzi | [gppezzi](https://github.com/gppezzi) | `@Guilherme` |
