@@ -15,11 +15,12 @@ import socket
 import time
 import uuid
 from collections import UserDict
+from pathlib import Path
 
 import reframe as rfm
 import reframe.utility.jsonext as jsonext
 import reframe.utility.osext as osext
-from reframe.core.exceptions import ReframeError, what, is_severe, reraise_as
+from reframe.core.exceptions import BuildError, ReframeError, SanityError, what, is_severe, reraise_as
 from reframe.core.logging import getlogger, _format_time_rfc3339, time_function
 from reframe.core.warnings import suppress_deprecations
 from reframe.utility import nodelist_abbrev, OrderedSet
@@ -386,6 +387,24 @@ class RunReport:
                         )
                         entry['job_completion_time'] = _format_time_rfc3339(
                             entry['job_completion_time_unix'], r'%FT%T%:z'
+                        )
+
+                # Store stdout/stderr contents in case of failures
+                if t.result in {'fail', 'xpass'}:
+                    exc_value = t.exc_info[1] if t.exc_info else None
+                    if isinstance(exc_value, BuildError) and check.build_job:
+                        entry['build_job_stdout_contents'] = osext.tail_b(
+                            Path(check.stagedir) / check.build_job.stdout
+                        )
+                        entry['build_job_stderr_contents'] = osext.tail_b(
+                            Path(check.stagedir) / check.build_job.stderr
+                        )
+                    elif isinstance(exc_value, SanityError) and check.job:
+                        entry['job_stdout_contents'] = osext.tail_b(
+                            Path(check.stagedir) / check.job.stdout
+                        )
+                        entry['job_stderr_contents'] = osext.tail_b(
+                            Path(check.stagedir) / check.job.stderr
                         )
 
                 testcases.append(entry)
