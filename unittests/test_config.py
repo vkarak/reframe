@@ -78,6 +78,14 @@ def test_load_config_python():
     assert len(site.sources) == 2
 
 
+def test_load_config_python_invalid():
+    # Try to load a test file as a configuration file, which is a common
+    # mistake that the static configuration validation should catch.
+    with pytest.raises(ConfigError,
+                       match=r'not a valid Python configuration file'):
+        config.load_config('unittests/resources/checks/hellocheck.py')
+
+
 def test_load_multiple_configs(generate_partial_configs):
     site = config.load_config(*generate_partial_configs)
     assert len(site.sources) == 4
@@ -93,14 +101,6 @@ def test_load_config_nouser(monkeypatch):
     monkeypatch.delenv('LNAME', raising=False)
     monkeypatch.delenv('USERNAME', raising=False)
     config.load_config()
-
-
-def test_load_config_python_invalid(tmp_path):
-    pyfile = tmp_path / 'settings.py'
-    pyfile.write_text('x = 1\n')
-    with pytest.raises(ConfigError,
-                       match=r'not a valid Python configuration file'):
-        config.load_config(pyfile)
 
 
 def test_load_config_json(tmp_path):
@@ -122,14 +122,6 @@ def test_load_config_json_invalid_syntax(tmp_path):
 def test_load_config_unknown_file(tmp_path):
     with pytest.raises(OSError):
         config.load_config(tmp_path / 'foo.json')
-
-
-def test_load_config_import_error():
-    # If the configuration file is relative to ReFrame and ImportError is
-    # raised, which should be wrapped inside ConfigError
-    with pytest.raises(ConfigError,
-                       match=r'could not load Python configuration file'):
-        config.load_config('reframe/core/foo.py')
 
 
 def test_load_config_unknown_filetype(tmp_path):
