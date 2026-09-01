@@ -56,7 +56,7 @@ Bigger changes (such as new major features, architectural changes, changes to th
 We decide by consensus.
 If we cannot agree, the leadership team votes and a simple majority wins.
 
-Changes to this document needs a 2/3 vote of the leadership team.
+Changes to this document need a 2/3 absolute majority of the leadership team.
 
 ## Releases
 
