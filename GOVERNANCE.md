@@ -25,7 +25,9 @@ Current members (alphabetically):
 - Eirini Koutsaniti ([@ekouts](https://github.com/ekouts)), CSCS
 - Guilherme Peretti-Pezzi ([@gppezzi](https://github.com/gppezzi)), CSCS
 
-Members are added by an absolute majority vote of the leadership team and removed by a 2/3 absolute majority.
+Members are added by an absolute majority vote of the leadership team.
+A leadership team member can step down at any time.
+A leadership team member can also be removed by a 2/3 absolute majority.
 The member to be removed is notified about the reasons and given the opportunity to respond.
 
 An "absolute majority" means more than half of the current leadership team members, regardless of how many participate in the vote.
