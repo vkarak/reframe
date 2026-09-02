@@ -1807,11 +1807,6 @@ def test_jsonext_dumps():
         {'foo': sn.defer(['bar']).evaluate()}, separators=(',', ':')
     )
     assert '{"(1, 2, 3)": 1}' == jsonext.dumps({(1, 2, 3): 1})
-    assert '{"foo": "bar"}' == jsonext.dumps({'foo': b'bar'})
-
-    # Invalid UTF-8 sequences must not raise and be replaced instead
-    assert (r'{"foo": "\ufffd\ufffd"}' ==
-            jsonext.dumps({'foo': b'\xff\xfe'}))
 
     def foo():
         pass

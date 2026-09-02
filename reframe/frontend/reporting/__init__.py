@@ -20,8 +20,10 @@ from pathlib import Path
 import reframe as rfm
 import reframe.utility.jsonext as jsonext
 import reframe.utility.osext as osext
+import reframe.utility.sanity as sn
 from reframe.core.exceptions import BuildError, ReframeError, SanityError, what, is_severe, reraise_as
 from reframe.core.logging import getlogger, _format_time_rfc3339, time_function
+from reframe.core.runtime import runtime
 from reframe.core.warnings import suppress_deprecations
 from reframe.utility import nodelist_abbrev, OrderedSet
 from .storage import StorageBackend
@@ -251,6 +253,9 @@ class RunReport:
             'runs': [],
             'restored_cases': []
         }
+        self.__fail_context = runtime().get_option(
+            'general/0/failure_inspect_lines'
+        )
         now = time.time()
         self.update_timestamps(now, now)
 
@@ -305,6 +310,18 @@ class RunReport:
         self.__report['session_info'].update(extras)
 
     def update_run_stats(self, stats):
+        def _job_contents(check, job, job_attr):
+            if job is None:
+                return None
+
+            try:
+                jobout = sn.evaluate(getattr(check, job_attr))
+                return ''.join(osext.tail(
+                    Path(check.stagedir) / jobout, self.__fail_context
+                ))
+            except (OSError, UnicodeError):
+                return None
+
         for runidx, tasks in stats.runs():
             testcases = []
             num_failures = 0
@@ -392,19 +409,19 @@ class RunReport:
                 # Store stdout/stderr contents in case of failures
                 if t.result in {'fail', 'xpass'}:
                     exc_value = t.exc_info[1] if t.exc_info else None
-                    if isinstance(exc_value, BuildError) and check.build_job:
-                        entry['build_job_stdout_contents'] = osext.tail_b(
-                            Path(check.stagedir) / check.build_job.stdout
+                    if isinstance(exc_value, BuildError):
+                        entry['build_job_stdout_contents'] = _job_contents(
+                            check, check.build_job, 'stdout'
                         )
-                        entry['build_job_stderr_contents'] = osext.tail_b(
-                            Path(check.stagedir) / check.build_job.stderr
+                        entry['build_job_stderr_contents'] = _job_contents(
+                            check, check.build_job, 'stderr'
                         )
-                    elif isinstance(exc_value, SanityError) and check.job:
-                        entry['job_stdout_contents'] = osext.tail_b(
-                            Path(check.stagedir) / check.job.stdout
+                    elif isinstance(exc_value, SanityError):
+                        entry['job_stdout_contents'] = _job_contents(
+                            check, check.job, 'stdout'
                         )
-                        entry['job_stderr_contents'] = osext.tail_b(
-                            Path(check.stagedir) / check.job.stderr
+                        entry['job_stderr_contents'] = _job_contents(
+                            check, check.job, 'stderr'
                         )
 
                 testcases.append(entry)

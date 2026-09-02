@@ -63,11 +63,6 @@ def encode(obj, **kwargs):
     if isinstance(obj, set):
         return list(obj)
 
-    if isinstance(obj, bytes):
-        # `errors='replace'` because a byte-bounded tail (e.g.
-        # osext.tail_b()) may be truncated mid multi-byte character
-        return obj.decode('utf-8', errors='replace')
-
     if isinstance(obj, BaseException):
         return str(obj)
 
