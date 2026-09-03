@@ -315,7 +315,7 @@ class RunReport:
                 return None
 
             try:
-                jobout = sn.evaluate(getattr(check, job_attr))
+                jobout = sn.evaluate(getattr(job, job_attr))
                 return ''.join(osext.tail(
                     Path(check.stagedir) / jobout, self.__fail_context
                 ))
@@ -568,6 +568,22 @@ class RunReport:
                                                      'message': fail_phase}
                     )
                     testcase_msg.text = f"{tc['fail_phase']}: {fail_reason}"
+
+                stdout_contents = (tc.get('build_job_stdout_contents') or
+                                   tc.get('job_stdout_contents'))
+                if stdout_contents:
+                    testcase_stdout = etree.SubElement(testcase, 'system-out')
+                    testcase_stdout.text = etree.CDATA(
+                        ''.join(stdout_contents)
+                    )
+
+                stderr_contents = (tc.get('build_job_stderr_contents') or
+                                   tc.get('job_stderr_contents'))
+                if stderr_contents:
+                    testcase_stderr = etree.SubElement(testcase, 'system-err')
+                    testcase_stderr.text = etree.CDATA(
+                        ''.join(stderr_contents)
+                    )
 
             testsuite_stdout = etree.SubElement(xml_testsuite, 'system-out')
             testsuite_stdout.text = ''
