@@ -338,7 +338,7 @@ def _xfmt(val):
 # Log record placeholders that were renamed; kept here so that format
 # strings referencing the old names keep working, with a deprecation warning
 _DEPRECATED_LOG_ALIASES = {
-    'check_jobid': 'check_job_jobid',
+    'check_jobid': 'check_job_id',
     'check_job_submit_time': 'check_job_submit_time_us',
 }
 

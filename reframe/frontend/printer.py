@@ -142,7 +142,7 @@ class PrettyPrinter:
                       f"{nodelist_abbrev(rec.get('job_nodelist', []))}")
             job_type = 'local' if rec['scheduler'] == 'local' else 'batch job'
             self.info(
-                f"  * Job type: {job_type} (id={rec.get('job_jobid')})"
+                f"  * Job type: {job_type} (id={rec.get('job_id')})"
             )
             self.info(f"  * Maintainers: {rec['maintainers']}")
             self.info(f"  * Failing phase: {rec['fail_phase']}")

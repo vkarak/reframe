@@ -10,7 +10,7 @@
                 "build_job_completion_time_us": {"type": ["number", "null"]},
                 "build_job_completion_timestamp": {"type": ["string", "null"]},
                 "build_job_exitcode": {"type": ["number", "null"]},
-                "build_job_jobid": {"type": ["string", "null"]},
+                "build_job_id": {"type": ["string", "null"]},
                 "build_job_nodelist": {
                     "type": "array", "items": {"type": "string"}
                 },
@@ -57,7 +57,7 @@
                 "job_completion_time_us": {"type": ["number", "null"]},
                 "job_completion_timestamp": {"type": ["string", "null"]},
                 "job_exitcode": {"type": ["number", "null"]},
-                "job_jobid": {"type": ["string", "null"]},
+                "job_id": {"type": ["string", "null"]},
                 "job_nodelist": {
                     "type": "array", "items": {"type": "string"}
                 },

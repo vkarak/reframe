@@ -225,7 +225,7 @@ def test_perf_logging(make_runner, make_exec_ctx, perf_test,
                 '%(check_job_completion_time)s,%(version)s,'
                 '%(check_display_name)s,%(check_system)s,'
                 '%(check_partition)s,%(check_environ)s,'
-                '%(check_jobid)s,%(check_result)s,%(check_perfvalues)s'
+                '%(check_job_id)s,%(check_result)s,%(check_perfvalues)s'
             ),
             perffmt='%(check_perf_value)s,%(check_perf_unit)s,'
         )

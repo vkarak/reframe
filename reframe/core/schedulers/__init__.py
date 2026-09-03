@@ -537,7 +537,7 @@ class Job(jsonext.JSONSerializable, metaclass=JobMeta):
         '''
         return self._exception
 
-    @loggable
+    @loggable_as('id')
     @property
     def jobid(self):
         '''The ID of this job.
