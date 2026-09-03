@@ -24,7 +24,7 @@ import reframe.utility.jsonext as jsonext
 import reframe.utility.osext as osext
 from reframe.core.exceptions import (ConfigError, LoggingError,
                                      WarningAsError, what)
-from reframe.core.warnings import suppress_deprecations
+from reframe.core.warnings import suppress_deprecations, user_deprecation_warning
 from reframe.utility import is_trivially_callable
 from reframe.utility.profile import TimeProfiler
 
@@ -335,6 +335,14 @@ def _xfmt(val):
     return _dofmt(val)
 
 
+# Log record placeholders that were renamed; kept here so that format
+# strings referencing the old names keep working, with a deprecation warning
+_DEPRECATED_LOG_ALIASES = {
+    'check_jobid': 'check_job_jobid',
+    'check_job_submit_time': 'check_job_submit_time_us',
+}
+
+
 class CheckFieldFormatter(logging.Formatter):
     '''Log formatter that dynamically looks up format specifiers inside a
     regression test.'''
@@ -354,6 +362,22 @@ class CheckFieldFormatter(logging.Formatter):
 
         # Always ignore the following keys in file logging
         self.__ignore_keys |= {'check_job_script_contents'}
+
+        # Resolve any deprecated placeholders used in the format string once;
+        # the format string is static, so there is no need to redo this
+        # on every call to formatMessage()
+        self.__alias_map = {}
+        for s in self.__specs:
+            if (new_name := _DEPRECATED_LOG_ALIASES.get(s)) is None:
+                continue
+
+            msg = (f"the '%({s})s' log record placeholder is deprecated; "
+                   f"please use '%({new_name})s' instead")
+            if msg not in _WARN_ONCE:
+                _WARN_ONCE.add(msg)
+                user_deprecation_warning(msg)
+
+            self.__alias_map[s] = new_name
 
     def _expand_fmt(self, record):
         if not self.__expand_vars:
@@ -396,7 +420,14 @@ class CheckFieldFormatter(logging.Formatter):
     def formatMessage(self, record):
         fmt = self._expand_fmt(record)
         for s in self.__specs:
-            if s != 'check_#ALL' and not hasattr(record, s):
+            if s == 'check_#ALL' or hasattr(record, s):
+                continue
+
+            # Check if placeholder has an alias
+            new_name = self.__alias_map.get(s)
+            if new_name is not None and hasattr(record, new_name):
+                setattr(record, s, getattr(record, new_name))
+            else:
                 setattr(record, s, None)
 
         record_proxy = dict(record.__dict__)
