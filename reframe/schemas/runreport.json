@@ -94,6 +94,7 @@
                     "type": "array", "items": {"type": "string"}
                 },
                 "result": {"type": "string"},
+                "run_index": {"type": "number"},
                 "scheduler": {"type": "string"},
                 "short_name": {"type": "string"},
                 "stagedir": {"type": ["string", "null"]},
