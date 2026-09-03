@@ -552,6 +552,7 @@ class RunReport:
                     xml_testsuite, 'testcase',
                     attrib={
                         'classname': tc['basename'],
+                        'file': tc['filename'],
                         'name': casename,
 
                         # XSD schema does not like the exponential format and
