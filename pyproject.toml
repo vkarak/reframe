@@ -58,6 +58,7 @@ reframe = "reframe.frontend.cli:main"
 [project.optional-dependencies]
 graylog = ["pygelf ~= 0.4"]
 no-analytics = []
+analytics = ["duckdb ~= 1.5", "pyarrow ~= 25.0"]
 
 [dependency-groups]
 dev = [
