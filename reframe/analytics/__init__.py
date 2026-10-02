@@ -3,12 +3,15 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
+from reframe.core.runtime import runtime
 from . import writer
+
+# `BackendBusy` is re-exported, as it is part of `store()`'s interface
 from .backends import Backend, BackendBusy   # noqa: F401
 from .flatten import flatten
 
 
-def store(report, backend='duckdb', persistent=False, retry_options=None,
+def store(report, database=None, persistent=False, retry_options=None,
           **options):
     '''Flatten a run report and append it to the analytics database.
 
@@ -21,7 +24,10 @@ def store(report, backend='duckdb', persistent=False, retry_options=None,
 
     :arg report: the run report to store; it must follow the
         ``reframe/schemas/runreport.json`` schema of the current data version.
-    :arg backend: the name of the analytics backend to use.
+    :arg database: URI of the database to store the results in, as described
+        in :func:`~reframe.analytics.backends.Backend.create`. If
+        :obj:`None`, the :attr:`~config.analytics.database` configuration
+        option is used.
     :arg persistent: retry a busy database and fall back to a Parquet file
         instead of raising :class:`BackendBusy`.
     :arg retry_options: options to pass to
@@ -36,7 +42,10 @@ def store(report, backend='duckdb', persistent=False, retry_options=None,
         ``persistent`` is not set.
     '''
 
-    backend = Backend.create(backend, **options)
+    if database is None:
+        database = runtime().get_option('analytics/0/database')
+
+    backend = Backend.create(database, **options)
     table = flatten(report)
     if not persistent:
         backend.append(table)

@@ -5,8 +5,7 @@
 
 '''Flattening of a run report into the rows of the analytics results table.'''
 
-import json
-
+import reframe.utility.jsonext as jsonext
 import reframe.utility.sanity as sn
 from .schema import TC_SPECIAL_FIELDS, TC_TYPED_FIELDS, arrow_schema
 
@@ -45,7 +44,10 @@ def _map_value(val):
     if val is None:
         return None
     elif isinstance(val, (list, dict)):
-        return json.dumps(val)
+        # The report may hold objects that are not JSON types, such as the
+        # exception type in `fail_info`, so it is serialized the same way as
+        # when it is dumped to a file
+        return jsonext.dumps(val)
     else:
         return str(val)
 

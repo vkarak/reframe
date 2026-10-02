@@ -14,6 +14,7 @@ import sys
 import time
 import traceback
 
+import reframe.analytics as analytics
 import reframe.core.config as config
 import reframe.core.exceptions as errors
 import reframe.core.logging as logging
@@ -816,6 +817,20 @@ def main():
         help='Dump progress information for the async execution'
     )
     argparser.add_argument(
+        dest='enable_analytics',
+        envvar='RFM_ENABLE_ANALYTICS',
+        configvar='analytics/enable',
+        action='store_true',
+        help='Enable analytics'
+    )
+    argparser.add_argument(
+        dest='enable_results_storage',
+        envvar='RFM_ENABLE_RESULTS_STORAGE',
+        configvar='storage/enable',
+        action='store_true',
+        help='Enable results storage'
+    )
+    argparser.add_argument(
         dest='perf_info_level',
         envvar='RFM_PERF_INFO_LEVEL',
         configvar='general/perf_info_level',
@@ -891,13 +906,6 @@ def main():
         configvar='general/resolve_module_conflicts',
         action='store_true',
         help='Resolve module conflicts automatically'
-    )
-    argparser.add_argument(
-        dest='enable_results_storage',
-        envvar='RFM_ENABLE_RESULTS_STORAGE',
-        configvar='storage/enable',
-        action='store_true',
-        help='Enable results storage'
     )
     argparser.add_argument(
         dest='slurm_job_cancel_reasons',
@@ -1378,6 +1386,7 @@ def main():
     # Print command line
     session_info = report['session_info']
     storage_status = 'on' if rt.get_option('storage/0/enable') else 'off'
+    analytics_status = 'on' if rt.get_option('analytics/0/enable') else 'off'
     printer.info('[ReFrame Setup]')
     print_infoline('version', session_info['version'])
     print_infoline('command', repr(session_info['cmdline']))
@@ -1402,6 +1411,11 @@ def main():
         'results database',
         f'[{storage_status}] '
         f'{osext.expandvars(rt.get_option("storage/0/sqlite_db_file"))!r}'
+    )
+    print_infoline(
+        'analytics database',
+        f'[{analytics_status}] '
+        f'{osext.expandvars(rt.get_option("analytics/0/database"))!r}'
     )
     printer.info('')
     try:
@@ -1876,7 +1890,7 @@ def main():
                         f'failed to create symlink to latest report: {e}'
                     )
 
-            # Store the generated report for analytics
+            # Store the generated report for analytics (legacy)
             if (rt.get_option('storage/0/enable') and
                 not report.is_empty() and not options.dry_run):
                 try:
@@ -1891,6 +1905,31 @@ def main():
                 else:
                     printer.info('Current session stored with UUID: '
                                  f'{sess_uuid}')
+
+            # Store the generated report in the analytics database
+            if (rt.get_option('analytics/0/enable') and
+                not report.is_empty() and not options.dry_run):
+                try:
+                    parquet_file = analytics.store(report, persistent=True)
+                except Exception as e:
+                    printer.warning(
+                        f'failed to store results in the analytics '
+                        f'database: {e}'
+                    )
+                    printer.verbose(
+                        ''.join(traceback.format_exception(*sys.exc_info()))
+                    )
+                else:
+                    sess_uuid = report['session_info']['uuid']
+                    if parquet_file is None:
+                        printer.info('Current session stored in the analytics '
+                                     f'database with UUID: {sess_uuid}')
+                    else:
+                        printer.warning(
+                            f'could not access the analytics database; '
+                            f'current session was stored in '
+                            f'{parquet_file!r} and must be imported manually'
+                        )
 
             # Generate the junit xml report for this session
             junit_report_file = rt.get_option('general/0/report_junit')

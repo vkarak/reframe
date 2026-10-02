@@ -15,7 +15,7 @@ import reframe.analytics.schema as schema
 import reframe.analytics.writer as writer
 import reframe.utility.osext as osext
 from reframe.analytics.backends import Backend, BackendBusy
-from reframe.core.exceptions import ReframeError
+from reframe.core.exceptions import ReframeError, SanityError
 
 duckdb = pytest.importorskip('duckdb')
 pa = pytest.importorskip('pyarrow')
@@ -45,7 +45,8 @@ def report():
     )
     failed_case = _testcase(
         1, 'B', result='fail', fail_phase='sanity',
-        fail_info={'exc_type': 'SanityError', 'traceback': ['x']}
+        # `exc_type` is an exception class, not a JSON type
+        fail_info={'exc_type': SanityError, 'traceback': ['x']}
     )
     return {
         'session_info': {'uuid': 'uuid-1', 'hostname': 'host',
@@ -155,6 +156,13 @@ def db_file(tmp_path):
     return str(tmp_path / 'sub' / 'results.duckdb')
 
 
+@pytest.fixture
+def database(db_file):
+    # An absolute file URI has three slashes, the last of which is the one of
+    # the path itself
+    return f'duckdb://{db_file}'
+
+
 def _query(db_file, sql):
     conn = duckdb.connect(db_file, read_only=True)
     try:
@@ -167,17 +175,17 @@ def _count(db_file):
     return _query(db_file, f'SELECT count(*) FROM {schema.TABLE_NAME}')
 
 
-def test_store_and_append(report, db_file):
-    analytics.store(report, db_file=db_file)
+def test_store_and_append(report, database, db_file):
+    analytics.store(report, database)
     assert _count(db_file) == [(3,)]
 
     # Storing the same session again is a no-op
-    analytics.store(report, db_file=db_file)
+    analytics.store(report, database)
     assert _count(db_file) == [(3,)]
 
     # A different session is appended
     report['session_info']['uuid'] = 'uuid-2'
-    analytics.store(report, db_file=db_file)
+    analytics.store(report, database)
     assert _count(db_file) == [(6,)]
     assert _query(
         db_file,
@@ -185,8 +193,8 @@ def test_store_and_append(report, db_file):
     ) == [('uuid-1',), ('uuid-2',)]
 
 
-def test_stored_types_and_values(report, db_file):
-    analytics.store(report, db_file=db_file)
+def test_stored_types_and_values(report, database, db_file):
+    analytics.store(report, database)
     types = {row[0]: row[1]
              for row in _query(db_file, f'DESCRIBE {schema.TABLE_NAME}')}
     assert types['pval'] == 'DOUBLE'
@@ -205,8 +213,8 @@ def test_stored_types_and_values(report, db_file):
                    ('B', None, None, None)]
 
 
-def test_append_releases_lock(report, db_file):
-    analytics.store(report, db_file=db_file)
+def test_append_releases_lock(report, database, db_file):
+    analytics.store(report, database)
     osext.run_command(
         [sys.executable, '-c',
          'import duckdb, sys; duckdb.connect(sys.argv[1]).close()', db_file],
@@ -214,8 +222,8 @@ def test_append_releases_lock(report, db_file):
     )
 
 
-def test_append_busy(report, db_file):
-    analytics.store(report, db_file=db_file)
+def test_append_busy(report, database, db_file):
+    analytics.store(report, database)
     holder = osext.run_command_async(
         [sys.executable, '-c',
          'import duckdb, sys\n'
@@ -226,20 +234,49 @@ def test_append_busy(report, db_file):
     )
     try:
         assert holder.stdout.readline().strip() == 'ready'
-        with pytest.raises(analytics.BackendBusy):
-            analytics.store(report, db_file=db_file)
+        with pytest.raises(BackendBusy):
+            analytics.store(report, database)
     finally:
         holder.communicate(timeout=60)
 
     # The database is usable again once the other process releases it
     report['session_info']['uuid'] = 'uuid-2'
-    analytics.store(report, db_file=db_file)
+    analytics.store(report, database)
     assert _count(db_file) == [(6,)]
 
 
-def test_unknown_backend(report):
+def test_database_uri(monkeypatch):
+    monkeypatch.setenv('TEST_DB_DIR', '/data/analytics')
+
+    # The expanded variable supplies the third slash of the file URI itself
+    backend = Backend.create('duckdb://${TEST_DB_DIR}/results.duckdb')
+    assert backend._db_file == '/data/analytics/results.duckdb'
+    assert backend.fallback_dir == '/data/analytics'
+
+    assert Backend.create(
+        'duckdb:///data/analytics/results.duckdb'
+    )._db_file == '/data/analytics/results.duckdb'
+
+    # The location is taken verbatim, so it is relative without a leading
+    # slash
+    assert Backend.create('duckdb://results.duckdb')._db_file == \
+        'results.duckdb'
+
+
+def test_invalid_database_uri(report):
     with pytest.raises(ReframeError, match='no such analytics backend'):
-        analytics.store(report, backend='foo')
+        analytics.store(report, 'foo:///results.db')
+
+    with pytest.raises(ReframeError, match='invalid analytics database URI'):
+        analytics.store(report, '/results.duckdb')
+
+    with pytest.raises(ReframeError, match='no analytics database file'):
+        analytics.store(report, 'duckdb://')
+
+    # An in-memory database would discard the results right after storing them
+    for uri in ('duckdb://:memory:', 'duckdb://:memory:named'):
+        with pytest.raises(ReframeError, match='in-memory analytics'):
+            analytics.store(report, uri)
 
 
 class _FlakyBackend(Backend):
@@ -350,14 +387,14 @@ def test_writer_propagates_other_errors(table, tmp_path, no_sleep):
     assert no_sleep == []
 
 
-def test_store_persistent_to_db(report, db_file):
-    assert analytics.store(report, db_file=db_file, persistent=True) is None
+def test_store_persistent_to_db(report, database, db_file):
+    assert analytics.store(report, database, persistent=True) is None
     assert _count(db_file) == [(3,)]
 
 
-def test_store_persistent_fallback_when_busy(report, db_file):
+def test_store_persistent_fallback_when_busy(report, database, db_file):
     # Create the database first, so that the holder below can lock it
-    analytics.store(report, db_file=db_file)
+    analytics.store(report, database)
     holder = osext.run_command_async(
         [sys.executable, '-c',
          'import duckdb, sys\n'
@@ -369,7 +406,7 @@ def test_store_persistent_fallback_when_busy(report, db_file):
     try:
         assert holder.stdout.readline().strip() == 'ready'
         filename = analytics.store(
-            report, db_file=db_file, persistent=True,
+            report, database, persistent=True,
             retry_options={'max_retries': 1, 'base_interval': 0.01}
         )
     finally:

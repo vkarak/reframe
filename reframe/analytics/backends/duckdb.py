@@ -4,10 +4,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import os
-from pathlib import Path
 
-import reframe.utility.osext as osext
-from reframe.core.runtime import runtime
+from reframe.core.exceptions import ReframeError
 from ..schema import COLUMNS, FLOAT, INT, STR, STR_MAP, TABLE_NAME
 from . import Backend, BackendBusy
 
@@ -22,17 +20,22 @@ _DUCKDB_TYPES = {
 class DuckDBBackend(Backend):
     '''Analytics backend that stores the results in a DuckDB database file.
 
-    :arg db_file: path of the database file. If :obj:`None`, the
-        ``storage/sqlite_db_file`` option is reused with its extension
-        replaced by ``.duckdb``.
+    :arg db_file: path of the database file, i.e. the location part of a
+        ``duckdb://`` URI, taken verbatim; it is relative unless it starts
+        with a slash. In-memory databases are not supported, since the results
+        would be discarded as soon as they were stored.
+    :raises ReframeError: if no database file is given or if it refers to an
+        in-memory database.
     '''
 
-    def __init__(self, db_file=None):
-        if db_file is None:
-            sqlite_file = osext.expandvars(
-                runtime().get_option('storage/0/sqlite_db_file')
-            )
-            db_file = str(Path(sqlite_file).with_suffix('.duckdb'))
+    def __init__(self, db_file):
+        if not db_file:
+            raise ReframeError('no analytics database file specified')
+
+        # Named in-memory databases are spelled `:memory:<name>`
+        if db_file.startswith(':memory:'):
+            raise ReframeError('in-memory analytics databases are not '
+                               'supported')
 
         self._db_file = db_file
 
