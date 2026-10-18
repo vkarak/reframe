@@ -1425,3 +1425,26 @@ def test_shipped_template_renders_with_its_defaults(shipped):
     # Whatever the query refers to is either supplied or defaulted
     assert statement.named_parameters <= params.keys() | \
         queries.defaults(text).keys()
+
+
+def test_perf_report_without_a_baseline():
+    path = os.path.join(SHIPPED_DIR, 'perf-report.sql')
+    if not os.path.exists(path):
+        pytest.skip('perf-report is not among the shipped templates')
+
+    text = queries.load(path)
+
+    # The default window compares against history
+    sql, _ = queries.render(text, {'session': 'x'})
+    _select_statement(sql)
+    assert 'baseline' in sql
+
+    # `lookback=0` drops the whole baseline machinery, rather than leaving its
+    # columns empty; the value arrives from the command line as a string
+    sql, params = queries.render(text, {'session': 'x', 'lookback': '0'})
+    _select_statement(sql)
+    for absent in ('baseline', 'anchor', 'pdiff'):
+        assert absent not in sql
+
+    # A parameter the rendered query no longer refers to is not bound
+    assert 'lookback' not in duckdb.extract_statements(sql)[0].named_parameters
